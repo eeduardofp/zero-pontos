@@ -20,15 +20,19 @@ const UI = (() => {
   }
 
   // ── PAGINAÇÃO ─────────────────────────────────────────────
+  const _pagerCbs = {}
+
   function renderPager(id, cur, total, cb) {
     const el = document.getElementById(id)
     if (!el) return
     if (total <= 1) { el.innerHTML = ''; return }
+    _pagerCbs[id] = cb
+    window._pagerGo = function(pid, p) { if (_pagerCbs[pid]) _pagerCbs[pid](p) }
     let h = ''
-    if (cur > 1) h += `<button onclick="(${cb.toString()})(${cur - 1})">‹</button>`
+    if (cur > 1) h += `<button onclick="_pagerGo('${id}',${cur - 1})">‹</button>`
     const s = Math.max(1, cur - 2), e = Math.min(total, cur + 2)
-    for (let i = s; i <= e; i++) h += `<button class="${i === cur ? 'on' : ''}" onclick="(${cb.toString()})(${i})">${i}</button>`
-    if (cur < total) h += `<button onclick="(${cb.toString()})(${cur + 1})">›</button>`
+    for (let i = s; i <= e; i++) h += `<button class="${i === cur ? 'on' : ''}" onclick="_pagerGo('${id}',${i})">${i}</button>`
+    if (cur < total) h += `<button onclick="_pagerGo('${id}',${cur + 1})">›</button>`
     h += `<span class="info">${cur}/${total}</span>`
     el.innerHTML = h
   }
