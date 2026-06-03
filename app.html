@@ -38,6 +38,9 @@
     <a data-page="financeiro" onclick="nav('financeiro')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Financeiro
     </a>
+    <a data-page="comercial" onclick="nav('comercial')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Comercial
+    </a>
     <a data-page="cadastro" onclick="nav('cadastro')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Novo cadastro
     </a>
@@ -250,6 +253,30 @@
   </div>
 </div>
 
+<div class="page" id="pg-comercial">
+  <div class="page-header">
+    <div><div class="page-title">Comercial</div><div class="page-sub">Pipeline de oportunidades de venda</div></div>
+    <button class="btn btn-primary" onclick="abrirNovaOportunidade()">+ Nova oportunidade</button>
+  </div>
+  <div class="metrics" id="com-metrics"></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="filters" style="margin-bottom:0">
+      <button class="fbtn on" onclick="UI.setFiltro(this,'com-view','kanban',renderComercial)">Kanban</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'com-view','historico',renderComercial)">Histórico</button>
+    </div>
+    <input type="hidden" id="com-view" value="kanban">
+    <div style="margin-left:auto" id="com-hist-filters" style="display:none">
+      <div class="filters" style="margin-bottom:0" id="com-status-filters">
+        <button class="fbtn on" onclick="UI.setFiltro(this,'com-hist-status','todos',renderComercial)">Todos</button>
+        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Convertida',renderComercial)">Convertidas</button>
+        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Perdida',renderComercial)">Perdidas</button>
+      </div>
+    </div>
+    <input type="hidden" id="com-hist-status" value="todos">
+  </div>
+  <div id="com-board"></div>
+</div>
+
 </div><!-- end main -->
 
 <!-- MODAL -->
@@ -267,6 +294,7 @@
 <script src="ui.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
+<script src="comercial.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', initApp)
 </script>

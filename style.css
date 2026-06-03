@@ -148,3 +148,6 @@ tbody td.bold{color:var(--text);font-weight:500}
 .login-logo{font-size:22px;font-weight:600;margin-bottom:4px}
 .login-sub{font-size:13px;color:var(--text3);margin-bottom:28px}
 .login-error{background:var(--red-bg);border:1px solid var(--red);color:var(--red);padding:10px 12px;border-radius:var(--radius);font-size:13px;margin-bottom:14px;display:none}
+
+/* COMERCIAL */
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bg)}.btn-danger:hover{border-color:var(--red)}
