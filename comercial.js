@@ -250,12 +250,115 @@ const Comercial = (() => {
           ${o.status !== 'Aberta'        ? `<button class="btn btn-ghost btn-sm" onclick="Comercial.moverStatus('${id}','Aberta')">← Mover para Aberta</button>` : ''}
           ${o.status !== 'Em negociação' ? `<button class="btn btn-ghost btn-sm" onclick="Comercial.moverStatus('${id}','Em negociação')">Mover para Em negociação →</button>` : ''}
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="Comercial.abrirConverter('${id}')">✓ Converter em serviço</button>
           <button class="btn btn-danger"  onclick="Comercial.abrirPerder('${id}')">✗ Marcar como perdida</button>
+          <button class="btn btn-ghost"   onclick="Comercial.abrirEditar('${id}')">✎ Editar</button>
         </div>
       ` : `<div style="color:var(--text3);font-size:13px">Esta oportunidade foi ${o.status === 'Convertida' ? 'convertida' : 'marcada como perdida'} em ${Data.fmtData(o.data_fechamento)}.</div>`}
     `)
+  }
+
+  function abrirEditar(id) {
+    const o = gOp(id); if (!o) return
+    const cl = o.cliente_id ? Data.gCliente(o.cliente_id) : null
+    const pl = o.placa_id   ? Data.gPlaca(o.placa_id)     : null
+
+    // Montar options de placas do cliente atual
+    const pls = o.cliente_id ? Data.placasDe(o.cliente_id) : []
+    const placaOpts = pls.length
+      ? pls.map(p => `<option value="${p.id}" ${p.id === o.placa_id ? 'selected' : ''}>${p.placa} · ${p.renavan}</option>`).join('')
+      : '<option value="">Nenhuma placa</option>'
+
+    UI.openModal(`
+      <div class="modal-title">Editar oportunidade</div>
+      <div class="modal-sub">${cl ? cl.nome : '—'}</div>
+
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Cliente</label>
+          <div class="ac-wrap">
+            <input class="form-ctrl" id="op-cliente-q" placeholder="Buscar cliente..."
+              oninput="Comercial.acFiltrar()" onfocus="Comercial.acFiltrar()" onblur="Comercial.acFechar()"
+              autocomplete="off" style="font-size:12px" value="${cl ? cl.nome : ''}">
+            <input type="hidden" id="op-cliente-val" value="${o.cliente_id || ''}">
+            <div class="ac-list" id="op-cliente-list"></div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Placa / Renavan</label>
+          <select class="form-ctrl" id="op-placa" style="font-size:12px">${placaOpts}</select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Código da AIT</label>
+          <input class="form-ctrl" id="op-ait" value="${o.codigo_ait || ''}" style="font-size:12px">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Descrição breve da multa</label>
+          <input class="form-ctrl" id="op-desc" value="${o.descricao || ''}" style="font-size:12px">
+        </div>
+      </div>
+
+      <div class="form-row3" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Valor da AIT (R$)</label>
+          <input class="form-ctrl" id="op-valor-ait" type="number" step="0.01" value="${o.valor_ait || ''}" style="font-size:12px">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Valor do nosso serviço (R$)</label>
+          <input class="form-ctrl" id="op-valor-serv" type="number" step="0.01" value="${o.valor_servico || ''}" style="font-size:12px">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Data de identificação</label>
+          <input class="form-ctrl" id="op-data-id" type="date" value="${o.data_identificacao || ''}" style="font-size:12px">
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Prazo limite para defesa</label>
+          <input class="form-ctrl" id="op-prazo-def" type="date" value="${o.prazo_defesa || ''}" style="font-size:12px">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Prazo de vencimento do débito</label>
+          <input class="form-ctrl" id="op-prazo-venc" type="date" value="${o.prazo_vencimento || ''}" style="font-size:12px">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="Comercial.salvarEdicao('${id}')">Salvar alterações</button>
+        <button class="btn btn-ghost" onclick="Comercial.abrirDetalhe('${id}')">Cancelar</button>
+      </div>
+    `)
+  }
+
+  async function salvarEdicao(id) {
+    const cid = document.getElementById('op-cliente-val').value
+    const cod = document.getElementById('op-ait').value.trim().toUpperCase()
+    if (!cid) { UI.notif('Selecione um cliente', 'error'); return }
+    if (!cod) { UI.notif('Informe o código da AIT', 'error'); return }
+
+    const fields = {
+      cliente_id:        cid,
+      placa_id:          document.getElementById('op-placa').value || null,
+      codigo_ait:        cod,
+      descricao:         document.getElementById('op-desc').value.trim(),
+      valor_ait:         parseFloat(document.getElementById('op-valor-ait').value) || null,
+      valor_servico:     parseFloat(document.getElementById('op-valor-serv').value) || null,
+      data_identificacao:document.getElementById('op-data-id').value || null,
+      prazo_defesa:      document.getElementById('op-prazo-def').value || null,
+      prazo_vencimento:  document.getElementById('op-prazo-venc').value || null,
+    }
+
+    try {
+      await updateOp(id, fields)
+      UI.closeModal()
+      await render()
+      UI.notif('Oportunidade atualizada!')
+    } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
   function abrirConverter(id) {
@@ -437,8 +540,8 @@ const Comercial = (() => {
   return {
     render,
     abrirNovaOportunidade, abrirDetalhe,
-    abrirConverter, abrirPerder,
-    salvarOportunidade, moverStatus,
+    abrirConverter, abrirPerder, abrirEditar,
+    salvarOportunidade, salvarEdicao, moverStatus,
     confirmarConverter, confirmarPerda,
     acFiltrar, acFechar
   }
