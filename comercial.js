@@ -199,7 +199,7 @@ const Comercial = (() => {
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Cliente</label>
           <div class="ac-wrap">
-            <input class="form-ctrl" id="op-cliente-q" placeholder="Buscar cliente..." oninput="opAcFilter()" onfocus="opAcOpen()" onblur="opAcClose()" autocomplete="off" style="font-size:12px">
+            <input class="form-ctrl" id="op-cliente-q" placeholder="Buscar cliente..." oninput="Comercial.opAcFilter()" onfocus="Comercial.opAcOpen()" onblur="Comercial.opAcClose()" autocomplete="off" style="font-size:12px">
             <input type="hidden" id="op-cliente-val">
             <div class="ac-list" id="op-cliente-list"></div>
           </div>
@@ -499,6 +499,6 @@ const Comercial = (() => {
     abrirConverter, abrirPerder,
     salvarOportunidade, moverStatus,
     confirmarConverter, confirmarPerda,
-    opAcFilter, opAcOpen, opAcClose
+    opAcFilter, opAcOpen, opAcClose, opAcSelect
   }
 })()
