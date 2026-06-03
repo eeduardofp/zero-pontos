@@ -256,20 +256,20 @@
 <div class="page" id="pg-comercial">
   <div class="page-header">
     <div><div class="page-title">Comercial</div><div class="page-sub">Pipeline de oportunidades de venda</div></div>
-    <button class="btn btn-primary" onclick="abrirNovaOportunidade()">+ Nova oportunidade</button>
+    <button class="btn btn-primary" onclick="Comercial.abrirNovaOportunidade()">+ Nova oportunidade</button>
   </div>
   <div class="metrics" id="com-metrics"></div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
     <div class="filters" style="margin-bottom:0">
-      <button class="fbtn on" onclick="UI.setFiltro(this,'com-view','kanban',renderComercial)">Kanban</button>
-      <button class="fbtn" onclick="UI.setFiltro(this,'com-view','historico',renderComercial)">Histórico</button>
+      <button class="fbtn on" onclick="UI.setFiltro(this,'com-view','kanban',()=>Comercial.render())">Kanban</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'com-view','historico',()=>Comercial.render())">Histórico</button>
     </div>
     <input type="hidden" id="com-view" value="kanban">
     <div style="margin-left:auto" id="com-hist-filters" style="display:none">
       <div class="filters" style="margin-bottom:0" id="com-status-filters">
-        <button class="fbtn on" onclick="UI.setFiltro(this,'com-hist-status','todos',renderComercial)">Todos</button>
-        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Convertida',renderComercial)">Convertidas</button>
-        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Perdida',renderComercial)">Perdidas</button>
+        <button class="fbtn on" onclick="UI.setFiltro(this,'com-hist-status','todos',()=>Comercial.render())">Todos</button>
+        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Convertida',()=>Comercial.render())">Convertidas</button>
+        <button class="fbtn" onclick="UI.setFiltro(this,'com-hist-status','Perdida',()=>Comercial.render())">Perdidas</button>
       </div>
     </div>
     <input type="hidden" id="com-hist-status" value="todos">
