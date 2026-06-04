@@ -231,48 +231,65 @@ function setKanbanGroup(g, btn) {
 }
 
 function kCard(a) {
-  const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
-  const v = Data.daysUntil(a.vencimento), d = Data.daysSince(a.ultima_att)
-  const info = v !== null ? (v < 0 ? 'Vencido há ' + Math.abs(v) + 'd' : 'Vence em ' + v + 'd') : (d === 999 ? 'Nunca att.' : d + 'd sem att.')
-  const urgCls = (v !== null && v <= 7) || d >= 21 ? 'style="border-left:3px solid var(--red)"'
-               : (v !== null && v <= 30) || d >= 10 ? 'style="border-left:3px solid var(--amber)"' : ''
-  return `<div class="kcard" ${urgCls} onclick="openKanbanCard('${a.id}')">
-    <div class="kcard-ait">${a.codigo.slice(0, 38)}</div>
-    <div class="kcard-placa">${pl ? pl.placa : '—'} · ${pl ? pl.renavan : '—'}</div>
-    <div class="kcard-foot"><span class="badge b-blue" style="font-size:10px">${Data.etapaAtual(a)}</span><span class="kcard-days">${info}</span></div>
-    </div>`
+  const pl = Data.gPlaca(a.placa_id)
+  const d = Data.daysSince(a.ultima_att)
+  const info = d === 999 ? 'Nunca att.' : d + 'd sem att.'
+  const urgCls = d >= 21 ? 'style="border-left:3px solid var(--red)"'
+               : d >= 10 ? 'style="border-left:3px solid var(--amber)"' : ''
+  const venc = a.vencimento ? ' \u00b7 vence ' + Data.fmtData(a.vencimento) : ''
+  return '<div class="kcard" ' + urgCls + ' onclick="openKanbanCard(\'' + a.id + '\')">' +
+    '<div class="kcard-ait">' + a.codigo.slice(0, 38) + '</div>' +
+    '<div class="kcard-placa">' + (pl ? pl.placa : '\u2014') + ' \u00b7 ' + (pl ? pl.renavan : '\u2014') + '</div>' +
+    '<div class="kcard-foot"><span class="badge b-blue" style="font-size:10px">' + Data.etapaAtual(a) + '</span>' +
+    '<span class="kcard-days">' + info + venc + '</span></div>' +
+    '</div>'
 }
 
 function renderKanban() {
   initKanbanFilters()
-  const ativas = Data.getAITs().filter(a => !a.encerrado && (kanbanAno === 'todos' || String(a.ano) === String(kanbanAno)))
+
+  // Critério: só AITs não encerradas que precisam ser verificadas (>=10d sem att)
+  // Filtro de ano respeitado — ao atualizar todas de 2026, cliente some do kanban de 2026
+  function kUrgScore(a) {
+    const d = Data.daysSince(a.ultima_att)
+    if (d >= 21) return 1
+    if (d >= 10) return 2
+    return 3
+  }
+
+  const ativas = Data.getAITs().filter(a =>
+    !a.encerrado &&
+    Data.daysSince(a.ultima_att) >= 10 &&
+    (kanbanAno === 'todos' || String(a.ano) === String(kanbanAno))
+  )
+
   const board = document.getElementById('kanban-board')
 
   if (kanbanGroup === 'urgencia') {
     board.className = 'kanban'
-    const urg = [], warn = [], ok = []
+    const urg = [], warn = []
     ativas.forEach(a => {
-      const sc = Data.urgScore(a)
-      if (sc <= 1) urg.push(a)
-      else if (sc === 2) warn.push(a)
-      else ok.push(a)
+      if (kUrgScore(a) === 1) urg.push(a)
+      else warn.push(a)
     })
-    const colCards = list => list.length
-      ? list.map(a => {
-          const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
-          const v = Data.daysUntil(a.vencimento), d = Data.daysSince(a.ultima_att)
-          const info = v !== null ? (v < 0 ? 'Vencido há ' + Math.abs(v) + 'd' : 'Vence em ' + v + 'd') : (d === 999 ? 'Nunca att.' : d + 'd sem att.')
-          return `<div class="kcard" onclick="openKanbanCard('${a.id}')">
-            <div class="kcard-ait">${a.codigo.slice(0, 38)}</div>
-            <div class="kcard-name">${cl ? cl.nome.split(' ').slice(0, 2).join(' ') : '—'}</div>
-            <div class="kcard-placa">${pl ? pl.placa : '—'} · ${pl ? pl.renavan : '—'}</div>
-            <div class="kcard-foot"><span class="badge b-blue" style="font-size:10px">${Data.etapaAtual(a)}</span><span class="kcard-days">${info}</span></div></div>`
-        }).join('')
-      : '<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">Nenhuma</div>'
+    function colCards(list) {
+      if (!list.length) return '<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">Nenhuma</div>'
+      return list.map(a => {
+        const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
+        const d = Data.daysSince(a.ultima_att)
+        const info = d === 999 ? 'Nunca att.' : d + 'd sem att.'
+        const venc = a.vencimento ? ' \u00b7 vence ' + Data.fmtData(a.vencimento) : ''
+        return '<div class="kcard" onclick="openKanbanCard(\'' + a.id + '\')">' +
+          '<div class="kcard-ait">' + a.codigo.slice(0, 38) + '</div>' +
+          '<div class="kcard-name">' + (cl ? cl.nome.split(' ').slice(0,2).join(' ') : '\u2014') + '</div>' +
+          '<div class="kcard-placa">' + (pl ? pl.placa : '\u2014') + ' \u00b7 ' + (pl ? pl.renavan : '\u2014') + '</div>' +
+          '<div class="kcard-foot"><span class="badge b-blue" style="font-size:10px">' + Data.etapaAtual(a) + '</span>' +
+          '<span class="kcard-days">' + info + venc + '</span></div></div>'
+      }).join('')
+    }
     board.innerHTML =
-      `<div class="kcol urgent"><div class="kcol-title">Verificar agora <span class="cnt">${urg.length}</span></div>${colCards(urg)}</div>` +
-      `<div class="kcol warn"><div class="kcol-title">Verificar em breve <span class="cnt">${warn.length}</span></div>${colCards(warn)}</div>` +
-      `<div class="kcol ok"><div class="kcol-title">Em dia <span class="cnt">${ok.length}</span></div>${colCards(ok)}</div>`
+      '<div class="kcol urgent"><div class="kcol-title">Verificar agora <span class="cnt">' + urg.length + '</span></div>' + colCards(urg) + '</div>' +
+      '<div class="kcol warn"><div class="kcol-title">Verificar em breve <span class="cnt">' + warn.length + '</span></div>' + colCards(warn) + '</div>'
     return
   }
 
@@ -287,26 +304,27 @@ function renderKanban() {
   })
   const grupos = Object.keys(clienteMap).map(cid => {
     const aitsG = clienteMap[cid]
-    aitsG.sort((a, b) => Data.urgScore(a) - Data.urgScore(b))
-    return { cid, aits: aitsG, score: Math.min(...aitsG.map(Data.urgScore)) }
+    aitsG.sort((a, b) => kUrgScore(a) - kUrgScore(b))
+    return { cid, aits: aitsG, score: Math.min.apply(null, aitsG.map(kUrgScore)) }
   }).sort((a, b) => a.score - b.score)
 
-  if (!grupos.length) { board.innerHTML = '<div style="color:var(--text3);text-align:center;padding:40px">Nenhuma AIT para exibir</div>'; return }
+  if (!grupos.length) {
+    const label = kanbanAno === 'todos' ? 'todos os anos' : kanbanAno
+    board.innerHTML = '<div style="color:var(--text3);text-align:center;padding:40px">Todas as AITs de ' + label + ' est\u00e3o atualizadas \u2705</div>'
+    return
+  }
 
   board.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">' +
     grupos.map(g => {
       const cl = Data.gCliente(g.cid)
       const nome = cl ? cl.nome : 'Cliente desconhecido'
-      const sc = g.score
-      const hc = sc <= 1 ? 'var(--red)' : sc === 2 ? 'var(--amber)' : 'var(--green)'
-      const hb = sc <= 1 ? 'var(--red-bg)' : sc === 2 ? 'var(--amber-bg)' : 'var(--green-bg)'
-      return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
-        <div style="padding:10px 14px;background:${hb};border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="openCliente('${g.cid}')">
-          <span style="font-size:13px;font-weight:600;color:${hc}">${nome.split(' ').slice(0, 3).join(' ')}</span>
-          <span class="badge b-na" style="font-size:10px">${g.aits.length} AIT${g.aits.length > 1 ? 's' : ''}</span>
-        </div>
-        <div style="padding:8px">${g.aits.map(kCard).join('')}</div>
-      </div>`
+      const hc = g.score === 1 ? 'var(--red)' : 'var(--amber)'
+      const hb = g.score === 1 ? 'var(--red-bg)' : 'var(--amber-bg)'
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">' +
+        '<div style="padding:10px 14px;background:' + hb + ';border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="openCliente(\'' + g.cid + '\')">' +
+        '<span style="font-size:13px;font-weight:600;color:' + hc + '">' + nome.split(' ').slice(0, 3).join(' ') + '</span>' +
+        '<span class="badge b-na" style="font-size:10px">' + g.aits.length + ' AIT' + (g.aits.length > 1 ? 's' : '') + '</span>' +
+        '</div><div style="padding:8px">' + g.aits.map(kCard).join('') + '</div></div>'
     }).join('') + '</div>'
 }
 
