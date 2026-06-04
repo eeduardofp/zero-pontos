@@ -751,6 +751,9 @@ async function checkKanbanCard(aid) {
     Data.updateAITCache(aid, fields)
     UI.updateStats()
     UI.closeModal()
+    // Recarregar do banco para garantir que o cache reflete o estado real
+    const fresh = await API.getAITs()
+    Data.load({ clientes: Data.getClientes(), placas: Data.getPlacas(), aits: fresh })
     renderKanban()
     UI.notif('Verificação registrada!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
