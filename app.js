@@ -610,12 +610,49 @@ function openCliente(cid) {
   const fatHTML = fat > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Total: <span style="color:var(--green);font-family:var(--mono)">${Data.fmtMoeda(fat)}</span></div>` : ''
 
   UI.openModal(
-    `<div class="modal-title">${c.nome}</div>
-    <div class="modal-sub">${ativas} processos ativos · ${aitsAll.length} total</div>
-    ${contatoHTML}${fatHTML}
-    <div style="margin-top:14px"><div class="section-title">Placas e AITs</div>
-    ${placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>'}</div>`
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px">' +
+    '<div class="modal-title">' + c.nome + '</div>' +
+    '<button class="btn btn-ghost btn-sm" onclick="editarCliente('' + cid + '')">✎ Editar</button>' +
+    '</div>' +
+    '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
+    contatoHTML + fatHTML +
+    '<div style="margin-top:14px"><div class="section-title">Placas e AITs</div>' +
+    (placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>') + '</div>'
   )
+}
+
+function editarCliente(cid) {
+  const c = Data.gCliente(cid); if (!c) return
+  UI.openModal(
+    '<div class="modal-title">Editar cliente</div>' +
+    '<div class="modal-sub">' + c.nome + '</div>' +
+    '<div class="form-group" style="margin-top:14px"><label class="form-label">Nome completo</label>' +
+    '<input class="form-ctrl" id="ec-nome" value="' + (c.nome || '') + '"></div>' +
+    '<div class="form-group"><label class="form-label">Contato / WhatsApp</label>' +
+    '<input class="form-ctrl" id="ec-contato" value="' + (c.contato || '') + '" placeholder="(47) 99999-9999"></div>' +
+    '<div class="form-group" style="margin-bottom:14px"><label class="form-label">E-mail</label>' +
+    '<input class="form-ctrl" id="ec-email" type="email" value="' + (c.email || '') + '" placeholder="cliente@email.com"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-primary" onclick="salvarEdicaoCliente('' + cid + '')">Salvar</button>' +
+    '<button class="btn btn-ghost" onclick="openCliente('' + cid + '')">Cancelar</button>' +
+    '</div>'
+  )
+}
+
+async function salvarEdicaoCliente(cid) {
+  const nome = document.getElementById('ec-nome').value.trim().toUpperCase()
+  if (!nome) { UI.notif('Nome obrigatório', 'error'); return }
+  const fields = {
+    nome,
+    contato: document.getElementById('ec-contato').value.trim(),
+    email:   document.getElementById('ec-email').value.trim()
+  }
+  try {
+    await Auth.getClient().from('clientes').update(fields).eq('id', cid)
+    Data.updateClienteCache(cid, fields)
+    UI.closeModal()
+    UI.notif('Cliente atualizado!')
+  } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
 }
 
 function expandPlaca(pid, total) {
@@ -630,53 +667,96 @@ function recolherPlaca(pid) {
   if (m) m.innerHTML = `<td colspan="3" style="padding:8px 0"><span onclick="expandPlaca('${pid}',${rows.length})" style="font-size:12px;color:var(--blue);cursor:pointer;font-family:var(--mono)">▸ ver todas as ${rows.length} AITs</span></td>`
 }
 
+function editarPlaca(pid, cid) {
+  const p = Data.gPlaca(pid); if (!p) return
+  UI.openModal(
+    '<div class="modal-title">Editar placa</div>' +
+    '<div class="modal-sub">Vinculada a ' + (Data.gCliente(cid) ? Data.gCliente(cid).nome : '—') + '</div>' +
+    '<div class="form-row" style="margin-top:14px;margin-bottom:14px">' +
+      '<div><label class="form-label">Placa</label><input class="form-ctrl" id="ep-placa" value="' + (p.placa || '') + '"></div>' +
+      '<div><label class="form-label">Renavan</label><input class="form-ctrl" id="ep-renavan" value="' + (p.renavan || '') + '"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-primary" onclick="salvarEdicaoPlaca('' + pid + '','' + cid + '')">Salvar</button>' +
+      '<button class="btn btn-ghost" onclick="openCliente('' + cid + '')">Cancelar</button>' +
+    '</div>'
+  )
+}
+
+async function salvarEdicaoPlaca(pid, cid) {
+  const placa   = document.getElementById('ep-placa').value.trim().toUpperCase()
+  const renavan = document.getElementById('ep-renavan').value.trim()
+  if (!placa || !renavan) { UI.notif('Preencha placa e renavan', 'error'); return }
+  const fields = { placa, renavan }
+  try {
+    await Auth.getClient().from('placas').update(fields).eq('id', pid)
+    const idx = Data.getPlacas().findIndex(p => p.id === pid)
+    if (idx >= 0) Object.assign(Data.getPlacas()[idx], fields)
+    UI.closeModal()
+    UI.notif('Placa atualizada!')
+    setTimeout(() => openCliente(cid), 300)
+  } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
 function openAIT(aid) {
   const a = Data.gAIT(aid); if (!a) return
   const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
   const et = Data.etapaAtual(a), da = Data.daysSince(a.ultima_att)
   const etHTML = (key, label) => {
     const s = a[key] || '', cls = UI.etClass(s)
-    return `<div class="etapa ${cls}"><div class="etapa-label">${label}</div><div class="etapa-val">${s || '—'}</div></div>`
+    return '<div class="etapa ' + cls + '"><div class="etapa-label">' + label + '</div><div class="etapa-val">' + (s || '—') + '</div></div>'
   }
   UI.openModal(
-    `<div class="modal-title" style="font-family:var(--mono);font-size:13px;word-break:break-all">${a.codigo}</div>
-    <div class="modal-sub">${cl ? cl.nome : '—'} · ${pl ? pl.placa : '—'}${pl ? ' · Renavan: ' + pl.renavan : ''}</div>
-    <div class="etapas" style="margin-bottom:16px">
-      ${etHTML('defesa_previa','Defesa Prévia')}${etHTML('jari','JARI')}${etHTML('segunda_instancia','2ª Instância')}
-    </div>
-    <div class="section-title" style="margin-bottom:8px">Detalhes</div>
-    <div class="field-grid" style="margin-bottom:16px">
-      <div class="field"><div class="field-label">Enquadramento</div><div class="field-val">${a.enquadramento || '—'}</div></div>
-      <div class="field"><div class="field-label">Etapa atual</div><div class="field-val">${et}</div></div>
-      <div class="field"><div class="field-label">Protocolo</div><div class="field-val mono">${a.protocolo || '—'}</div></div>
-      <div class="field"><div class="field-label">Senha</div><div class="field-val mono">${a.senha || '—'}</div></div>
-      <div class="field"><div class="field-label">Última atualização</div><div class="field-val">${a.ultima_att || '—'}${da < 999 ? ' (' + da + 'd atrás)' : ''}</div></div>
-      <div class="field"><div class="field-label">Vencimento</div><div class="field-val">${a.vencimento || '—'}</div></div>
-      <div class="field"><div class="field-label">Data da venda</div><div class="field-val">${Data.fmtData(a.data_venda)}</div></div>
-      <div class="field"><div class="field-label">Valor do serviço</div><div class="field-val" style="color:var(--green)">${a.valor ? Data.fmtMoeda(a.valor) : '—'}</div></div>
-      <div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">${a.observacao || '—'}</div></div>
-    </div>
-    <div class="section-title" style="margin-bottom:10px">Atualizar</div>
-    <div class="form-row3" style="margin-bottom:8px">
-      <div><label class="form-label">Defesa Prévia</label>${UI.etapaSelect('ed-def', a.defesa_previa)}</div>
-      <div><label class="form-label">JARI</label>${UI.etapaSelect('ed-jari', a.jari)}</div>
-      <div><label class="form-label">2ª Instância</label>${UI.etapaSelect('ed-seg', a.segunda_instancia)}</div>
-    </div>
-    <div class="form-row" style="margin-bottom:8px">
-      <div><label class="form-label">Vencimento</label><input type="date" class="form-ctrl" id="ed-venc" value="${a.vencimento || ''}" style="font-size:12px"></div>
-      <div><label class="form-label">Data da venda</label><input type="date" class="form-ctrl" id="ed-dvenda" value="${a.data_venda || ''}" style="font-size:12px"></div>
-    </div>
-    <div class="form-row" style="margin-bottom:12px">
-      <div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="${a.valor || ''}" placeholder="0,00" style="font-size:12px"></div>
-      <div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="${a.observacao || ''}" style="font-size:12px"></div>
-    </div>
-    <button class="btn btn-primary" onclick="salvarEdicaoAIT('${aid}')">Salvar</button>`
+    '<div class="modal-title" style="font-family:var(--mono);font-size:13px;word-break:break-all">' + a.codigo + '</div>' +
+    '<div class="modal-sub">' + (cl ? cl.nome : '—') + ' · ' + (pl ? pl.placa : '—') + (pl ? ' · Renavan: ' + pl.renavan : '') + '</div>' +
+    '<div class="etapas" style="margin-bottom:16px">' +
+      etHTML('defesa_previa','Defesa Prévia') + etHTML('jari','JARI') + etHTML('segunda_instancia','2ª Instância') +
+    '</div>' +
+    '<div class="section-title" style="margin-bottom:8px">Detalhes</div>' +
+    '<div class="field-grid" style="margin-bottom:16px">' +
+      '<div class="field"><div class="field-label">Enquadramento</div><div class="field-val">' + (a.enquadramento || '—') + '</div></div>' +
+      '<div class="field"><div class="field-label">Etapa atual</div><div class="field-val">' + et + '</div></div>' +
+      '<div class="field"><div class="field-label">Protocolo</div><div class="field-val mono">' + (a.protocolo || '—') + '</div></div>' +
+      '<div class="field"><div class="field-label">Senha</div><div class="field-val mono">' + (a.senha || '—') + '</div></div>' +
+      '<div class="field"><div class="field-label">Última atualização</div><div class="field-val">' + (a.ultima_att || '—') + (da < 999 ? ' (' + da + 'd atrás)' : '') + '</div></div>' +
+      '<div class="field"><div class="field-label">Vencimento</div><div class="field-val">' + (a.vencimento || '—') + '</div></div>' +
+      '<div class="field"><div class="field-label">Data da venda</div><div class="field-val">' + Data.fmtData(a.data_venda) + '</div></div>' +
+      '<div class="field"><div class="field-label">Valor do serviço</div><div class="field-val" style="color:var(--green)">' + (a.valor ? Data.fmtMoeda(a.valor) : '—') + '</div></div>' +
+      '<div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">' + (a.observacao || '—') + '</div></div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-bottom:10px">Editar</div>' +
+    '<div class="form-row" style="margin-bottom:8px">' +
+      '<div><label class="form-label">Código da AIT</label><input class="form-ctrl" id="ed-codigo" value="' + (a.codigo || '') + '" style="font-size:12px"></div>' +
+      '<div><label class="form-label">Enquadramento</label><input class="form-ctrl" id="ed-enq" value="' + (a.enquadramento || '') + '" style="font-size:12px"></div>' +
+    '</div>' +
+    '<div class="form-row" style="margin-bottom:8px">' +
+      '<div><label class="form-label">Protocolo</label><input class="form-ctrl" id="ed-proto" value="' + (a.protocolo || '') + '" style="font-size:12px"></div>' +
+      '<div><label class="form-label">Senha</label><input class="form-ctrl" id="ed-senha" value="' + (a.senha || '') + '" style="font-size:12px"></div>' +
+    '</div>' +
+    '<div class="form-row3" style="margin-bottom:8px">' +
+      '<div><label class="form-label">Defesa Prévia</label>' + UI.etapaSelect('ed-def', a.defesa_previa) + '</div>' +
+      '<div><label class="form-label">JARI</label>' + UI.etapaSelect('ed-jari', a.jari) + '</div>' +
+      '<div><label class="form-label">2ª Instância</label>' + UI.etapaSelect('ed-seg', a.segunda_instancia) + '</div>' +
+    '</div>' +
+    '<div class="form-row" style="margin-bottom:8px">' +
+      '<div><label class="form-label">Vencimento do recurso</label><input type="date" class="form-ctrl" id="ed-venc" value="' + (a.vencimento || '') + '" style="font-size:12px"></div>' +
+      '<div><label class="form-label">Data da venda</label><input type="date" class="form-ctrl" id="ed-dvenda" value="' + (a.data_venda || '') + '" style="font-size:12px"></div>' +
+    '</div>' +
+    '<div class="form-row" style="margin-bottom:12px">' +
+      '<div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="' + (a.valor || '') + '" placeholder="0,00" style="font-size:12px"></div>' +
+      '<div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="' + (a.observacao || '') + '" style="font-size:12px"></div>' +
+    '</div>' +
+    '<button class="btn btn-primary" onclick="salvarEdicaoAIT('' + aid + '')">Salvar alterações</button>'
   )
 }
 
 async function salvarEdicaoAIT(aid) {
   const a = Data.gAIT(aid); if (!a) return
   const fields = {
+    codigo:             document.getElementById('ed-codigo').value.trim().toUpperCase() || a.codigo,
+    enquadramento:      document.getElementById('ed-enq').value.trim(),
+    protocolo:          document.getElementById('ed-proto').value.trim(),
+    senha:              document.getElementById('ed-senha').value.trim(),
     defesa_previa:      document.getElementById('ed-def').value  || a.defesa_previa,
     jari:               document.getElementById('ed-jari').value || a.jari,
     segunda_instancia:  document.getElementById('ed-seg').value  || a.segunda_instancia,
