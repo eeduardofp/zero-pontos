@@ -612,33 +612,40 @@ function openCliente(cid) {
   UI.openModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px">' +
     '<div class="modal-title">' + c.nome + '</div>' +
-    '<button class="btn btn-ghost btn-sm" onclick="editarCliente('' + cid + '')">✎ Editar</button>' +
+    '<button class="btn btn-ghost btn-sm" id="cl-edit-btn">✎ Editar</button>' +
     '</div>' +
     '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
     contatoHTML + fatHTML +
     '<div style="margin-top:14px"><div class="section-title">Placas e AITs</div>' +
     (placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>') + '</div>'
   )
+  const editBtn = document.getElementById('cl-edit-btn')
+  if (editBtn) editBtn.onclick = function() { editarCliente(cid) }
 }
 
 function editarCliente(cid) {
   const c = Data.gCliente(cid); if (!c) return
-  UI.openModal(
-    '<div class="modal-title">Editar cliente</div>' +
-    '<div class="modal-sub">' + c.nome + '</div>' +
-    '<div class="form-group" style="margin-top:14px"><label class="form-label">Nome completo</label>' +
-    '<input class="form-ctrl" id="ec-nome" value="' + (c.nome || '') + '"></div>' +
-    '<div class="form-group"><label class="form-label">Contato / WhatsApp</label>' +
-    '<input class="form-ctrl" id="ec-contato" value="' + (c.contato || '') + '" placeholder="(47) 99999-9999"></div>' +
-    '<div class="form-group" style="margin-bottom:14px"><label class="form-label">E-mail</label>' +
-    '<input class="form-ctrl" id="ec-email" type="email" value="' + (c.email || '') + '" placeholder="cliente@email.com"></div>' +
-    '<div style="display:flex;gap:8px">' +
-    '<button class="btn btn-primary" onclick="salvarEdicaoCliente('' + cid + '')">Salvar</button>' +
-    '<button class="btn btn-ghost" onclick="openCliente('' + cid + '')">Cancelar</button>' +
+  const parts = [
+    '<div class="modal-title">Editar cliente</div>',
+    '<div class="modal-sub">' + c.nome + '</div>',
+    '<div class="form-group" style="margin-top:14px">',
+    '<label class="form-label">Nome completo</label>',
+    '<input class="form-ctrl" id="ec-nome" value="' + (c.nome || '') + '"></div>',
+    '<div class="form-group">',
+    '<label class="form-label">Contato / WhatsApp</label>',
+    '<input class="form-ctrl" id="ec-contato" value="' + (c.contato || '') + '" placeholder="(47) 99999-9999"></div>',
+    '<div class="form-group" style="margin-bottom:14px">',
+    '<label class="form-label">E-mail</label>',
+    '<input class="form-ctrl" id="ec-email" type="email" value="' + (c.email || '') + '" placeholder="cliente@email.com"></div>',
+    '<div style="display:flex;gap:8px">',
+    '<button class="btn btn-primary" id="ec-save">Salvar</button>',
+    '<button class="btn btn-ghost" id="ec-cancel">Cancelar</button>',
     '</div>'
-  )
+  ]
+  UI.openModal(parts.join(''))
+  document.getElementById('ec-save').onclick = function() { salvarEdicaoCliente(cid) }
+  document.getElementById('ec-cancel').onclick = function() { openCliente(cid) }
 }
-
 async function salvarEdicaoCliente(cid) {
   const nome = document.getElementById('ec-nome').value.trim().toUpperCase()
   if (!nome) { UI.notif('Nome obrigatório', 'error'); return }
@@ -669,20 +676,25 @@ function recolherPlaca(pid) {
 
 function editarPlaca(pid, cid) {
   const p = Data.gPlaca(pid); if (!p) return
-  UI.openModal(
-    '<div class="modal-title">Editar placa</div>' +
-    '<div class="modal-sub">Vinculada a ' + (Data.gCliente(cid) ? Data.gCliente(cid).nome : '—') + '</div>' +
-    '<div class="form-row" style="margin-top:14px;margin-bottom:14px">' +
-      '<div><label class="form-label">Placa</label><input class="form-ctrl" id="ep-placa" value="' + (p.placa || '') + '"></div>' +
-      '<div><label class="form-label">Renavan</label><input class="form-ctrl" id="ep-renavan" value="' + (p.renavan || '') + '"></div>' +
-    '</div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-primary" onclick="salvarEdicaoPlaca('' + pid + '','' + cid + '')">Salvar</button>' +
-      '<button class="btn btn-ghost" onclick="openCliente('' + cid + '')">Cancelar</button>' +
+  const cl = Data.gCliente(cid)
+  const parts = [
+    '<div class="modal-title">Editar placa</div>',
+    '<div class="modal-sub">Vinculada a ' + (cl ? cl.nome : '—') + '</div>',
+    '<div class="form-row" style="margin-top:14px;margin-bottom:14px">',
+    '<div><label class="form-label">Placa</label>',
+    '<input class="form-ctrl" id="ep-placa" value="' + (p.placa || '') + '"></div>',
+    '<div><label class="form-label">Renavan</label>',
+    '<input class="form-ctrl" id="ep-renavan" value="' + (p.renavan || '') + '"></div>',
+    '</div>',
+    '<div style="display:flex;gap:8px">',
+    '<button class="btn btn-primary" id="ep-save">Salvar</button>',
+    '<button class="btn btn-ghost" id="ep-cancel">Cancelar</button>',
     '</div>'
-  )
+  ]
+  UI.openModal(parts.join(''))
+  document.getElementById('ep-save').onclick = function() { salvarEdicaoPlaca(pid, cid) }
+  document.getElementById('ep-cancel').onclick = function() { openCliente(cid) }
 }
-
 async function salvarEdicaoPlaca(pid, cid) {
   const placa   = document.getElementById('ep-placa').value.trim().toUpperCase()
   const renavan = document.getElementById('ep-renavan').value.trim()
@@ -746,8 +758,10 @@ function openAIT(aid) {
       '<div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="' + (a.valor || '') + '" placeholder="0,00" style="font-size:12px"></div>' +
       '<div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="' + (a.observacao || '') + '" style="font-size:12px"></div>' +
     '</div>' +
-    '<button class="btn btn-primary" onclick="salvarEdicaoAIT('' + aid + '')">Salvar alterações</button>'
+    '<button class="btn btn-primary" id="ait-save-btn">Salvar alterações</button>'
   )
+  const aitSaveBtn = document.getElementById('ait-save-btn')
+  if (aitSaveBtn) aitSaveBtn.onclick = function() { salvarEdicaoAIT(aid) }
 }
 
 async function salvarEdicaoAIT(aid) {
