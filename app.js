@@ -36,7 +36,6 @@ function nav(page) {
   if (page === 'kanban')     renderKanban()
   if (page === 'recursos')   renderRecursos()
   if (page === 'financeiro') renderFinanceiro()
-  if (page === 'suspensoes') Suspensoes.render()
   if (page === 'comercial')  Comercial.render()
   if (page === 'cadastro')   initCadastro()
   if (page === 'busca')      document.getElementById('busca-q').focus()
@@ -895,4 +894,135 @@ async function confirmarRecurso(aid, etKey) {
     renderRecursos()
     UI.notif('Recurso protocolado — AIT voltou para verificação!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
+// ─── EXPORTAÇÃO EXCEL ────────────────────────────────────────
+function exportarAITs() {
+  const aits = Data.getAITs()
+  const rows = [
+    ['Cliente', 'Placa', 'Renavan', 'Código AIT', 'Enquadramento', 'Protocolo', 'Senha',
+     'Ano', 'Defesa Prévia', 'JARI', '2ª Instância', 'Etapa Atual', 'Status',
+     'Vencimento Recurso', 'Data Venda', 'Valor (R$)', 'Pagamento',
+     'Última Atualização', 'Encerrado', 'Observação']
+  ]
+  aits.forEach(a => {
+    const pl = Data.gPlaca(a.placa_id)
+    const cl = pl ? Data.gCliente(pl.cliente_id) : null
+    rows.push([
+      cl ? cl.nome : '',
+      pl ? pl.placa : '',
+      pl ? pl.renavan : '',
+      a.codigo || '',
+      a.enquadramento || '',
+      a.protocolo || '',
+      a.senha || '',
+      a.ano || '',
+      a.defesa_previa || '',
+      a.jari || '',
+      a.segunda_instancia || '',
+      Data.etapaAtual(a),
+      Data.statusAtual(a),
+      a.vencimento || '',
+      a.data_venda || '',
+      a.valor || 0,
+      a.pagamento || 'Pendente',
+      a.ultima_att || '',
+      a.encerrado ? 'Sim' : 'Não',
+      a.observacao || ''
+    ])
+  })
+  downloadExcel(rows, 'AITs_ZeroPontos_' + Data.today() + '.xlsx')
+  UI.notif('Exportando ' + aits.length + ' AITs...')
+}
+
+function exportarSuspensoes() {
+  // Pegar dados direto do Supabase
+  Auth.getClient()
+    .from('suspensoes')
+    .select('*, clientes(nome, contato, email)')
+    .order('ano', { ascending: false })
+    .then(({ data, error }) => {
+      if (error) { UI.notif('Erro ao exportar: ' + error.message, 'error'); return }
+      const rows = [
+        ['Cliente', 'Processo', 'Protocolo', 'Senha', 'Ano',
+         'Defesa Prévia', 'JARI', 'CETRAN',
+         'Vencimento JARI', 'Vencimento CETRAN',
+         'Etapa Atual', 'Status', 'Última Atualização', 'Encerrado', 'Observação']
+      ]
+      data.forEach(s => {
+        const nome = s.clientes ? s.clientes.nome : ''
+        const et = Suspensoes ? calcEtapaSus(s) : ''
+        rows.push([
+          nome,
+          s.processo || '',
+          s.protocolo || '',
+          s.senha || '',
+          s.ano || '',
+          s.defesa_previa || '',
+          s.jari || '',
+          s.cetran || '',
+          s.vencimento_jari || '',
+          s.vencimento_cetran || '',
+          et,
+          calcStatusSus(s),
+          s.ultima_att || '',
+          s.encerrado ? 'Sim' : 'Não',
+          s.observacao || ''
+        ])
+      })
+      downloadExcel(rows, 'Suspensoes_ZeroPontos_' + Data.today() + '.xlsx')
+      UI.notif('Exportando ' + data.length + ' suspensões...')
+    })
+}
+
+function calcEtapaSus(s) {
+  if (s.encerrado) return 'Encerrado'
+  if (!s.defesa_previa || s.defesa_previa === 'Aguardando' || s.defesa_previa === 'Não realizado') return 'Defesa Prévia'
+  if (s.defesa_previa === 'Deferido') return 'Encerrado'
+  if (s.defesa_previa === 'Indeferido') {
+    if (!s.jari || s.jari === 'Aguardando' || s.jari === 'Não realizado') return 'JARI'
+    if (s.jari === 'Deferido') return 'Encerrado'
+    if (s.jari === 'Indeferido') return s.cetran ? 'CETRAN' : 'CETRAN'
+  }
+  return 'Defesa Prévia'
+}
+
+function calcStatusSus(s) {
+  const et = calcEtapaSus(s)
+  if (et === 'Defesa Prévia') return s.defesa_previa || 'Aguardando'
+  if (et === 'JARI')         return s.jari          || 'Aguardando'
+  if (et === 'CETRAN')       return s.cetran         || 'Aguardando'
+  if (et === 'Encerrado') {
+    if (s.defesa_previa==='Deferido'||s.jari==='Deferido'||s.cetran==='Deferido') return 'Deferido'
+    return 'Indeferido'
+  }
+  return 'Aguardando'
+}
+
+function downloadExcel(rows, filename) {
+  // Gerar CSV como fallback caso SheetJS não esteja disponível
+  // Mas usar SheetJS se disponível via CDN
+  if (typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    // Largura automática das colunas
+    const colWidths = rows[0].map((_, ci) => ({
+      wch: Math.max(...rows.map(r => String(r[ci] || '').length), 10)
+    }))
+    ws['!cols'] = colWidths
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados')
+    XLSX.writeFile(wb, filename)
+  } else {
+    // Fallback: CSV
+    const csv = rows.map(r =>
+      r.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',')
+    ).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename.replace('.xlsx', '.csv')
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 }
