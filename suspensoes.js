@@ -3,6 +3,8 @@ const Suspensoes = (() => {
   let lista = []
   let pagina = 1
   const POR_PAGINA = 30
+  let sortCol = 'ultima_att'
+  let sortDir = 'desc'
 
   // ── SUPABASE ──────────────────────────────────────────────
   function db() { return Auth.getClient() }
@@ -93,6 +95,27 @@ const Suspensoes = (() => {
     renderLista()
   }
 
+  function sortBy(col) {
+    if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc'
+    else { sortCol = col; sortDir = col === 'ultima_att' ? 'desc' : 'asc' }
+    renderLista()
+  }
+
+  function sortIcon(col) {
+    if (sortCol !== col) return '<span style="color:var(--text3);margin-left:4px">↕</span>'
+    return '<span style="color:var(--blue);margin-left:4px">' + (sortDir === 'asc' ? '↑' : '↓') + '</span>'
+  }
+
+  function vencimentoAtual(s) {
+    // Retorna o vencimento mais relevante baseado na etapa atual
+    const et = etapaAtual(s)
+    if (et === 'CETRAN' && s.vencimento_cetran) return s.vencimento_cetran
+    if (et === 'JARI' && s.vencimento_jari) return s.vencimento_jari
+    if (s.vencimento_cetran) return s.vencimento_cetran
+    if (s.vencimento_jari) return s.vencimento_jari
+    return null
+  }
+
   function renderLista(p) {
     if (p) pagina = p
     const q = (document.getElementById('sus-q') || {}).value || ''
@@ -123,6 +146,38 @@ const Suspensoes = (() => {
 
     document.getElementById('sus-count').textContent = filtrada.length + ' suspensões'
 
+    // Ordenação
+    filtrada.sort((a, b) => {
+      let va, vb
+      if (sortCol === 'ultima_att') {
+        va = a.ultima_att || '0000-00-00'
+        vb = b.ultima_att || '0000-00-00'
+      } else if (sortCol === 'vencimento') {
+        va = vencimentoAtual(a) || '9999-99-99'
+        vb = vencimentoAtual(b) || '9999-99-99'
+      } else if (sortCol === 'nome') {
+        va = nomeCliente(a).toLowerCase()
+        vb = nomeCliente(b).toLowerCase()
+      } else if (sortCol === 'etapa') {
+        const ordem = {'Defesa Prévia':0,'JARI':1,'CETRAN':2,'Encerrado':3}
+        va = ordem[etapaAtual(a)] ?? 9
+        vb = ordem[etapaAtual(b)] ?? 9
+      } else if (sortCol === 'status') {
+        const ordem = {'Aguardando':0,'Indeferido':1,'Deferido':2,'Não realizado':3,'Encerrado':4}
+        va = ordem[statusAtual(a)] ?? 9
+        vb = ordem[statusAtual(b)] ?? 9
+      } else if (sortCol === 'ano') {
+        va = a.ano || 0
+        vb = b.ano || 0
+      } else {
+        va = (a[sortCol] || '').toString().toLowerCase()
+        vb = (b[sortCol] || '').toString().toLowerCase()
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
     const total = Math.ceil(filtrada.length / POR_PAGINA) || 1
     if (pagina > total) pagina = 1
     const slice = filtrada.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
@@ -134,6 +189,24 @@ const Suspensoes = (() => {
       const curAno = anoSel.value
       anoSel.innerHTML = '<option value="todos">Todos os anos</option>' +
         anos.map(y => '<option value="' + y + '" ' + (curAno === String(y) ? 'selected' : '') + '>' + y + '</option>').join('')
+    }
+
+    // Atualizar thead com ícones de ordenação
+    const thead = document.querySelector('#pg-suspensoes thead tr')
+    if (thead) {
+      var cols = [
+        {key:'nome',      label:'Cliente',    w:'20%'},
+        {key:'processo',  label:'Processo',   w:'100px'},
+        {key:'etapa',     label:'Etapa',      w:'90px'},
+        {key:'status',    label:'Status',     w:'100px'},
+        {key:'ano',       label:'Ano',        w:'55px'},
+        {key:'vencimento',label:'Vencimento', w:'90px'},
+        {key:'ultima_att',label:'Últ. att.',  w:'80px'}
+      ]
+      var thHtml = cols.map(function(c) {
+        return '<th style="width:' + c.w + ';cursor:pointer" onclick="Suspensoes.sortBy(\'' + c.key + '\')">' + c.label + sortIcon(c.key) + '</th>'
+      }).join('') + '<th>Observação</th>'
+      thead.innerHTML = thHtml
     }
 
     const tbody = document.getElementById('sus-tbody')
@@ -155,13 +228,20 @@ const Suspensoes = (() => {
                      : diasAtt === 0    ? '<span style="color:var(--green)">Hoje</span>'
                      : '<span style="color:' + (diasAtt >= 21 ? 'var(--red)' : diasAtt >= 10 ? 'var(--amber)' : 'var(--text3)') + '">' + diasAtt + 'd atrás</span>'
 
+      const venc = vencimentoAtual(s)
+      const vencDias = venc ? Data.daysUntil(venc) : null
+      const vencLabel = !venc ? '<span style="color:var(--text3)">—</span>'
+        : vencDias < 0 ? '<span style="color:var(--red)">' + Data.fmtData(venc) + '</span>'
+        : vencDias <= 14 ? '<span style="color:var(--amber)">' + Data.fmtData(venc) + '</span>'
+        : '<span style="color:var(--text2)">' + Data.fmtData(venc) + '</span>'
+
       return '<tr onclick="Suspensoes.abrirDetalhe(\'' + s.id + '\')">' +
         '<td class="bold">' + nomeCliente(s).slice(0, 24) + '</td>' +
         '<td style="font-family:var(--mono);font-size:12px">' + (s.processo || '—') + '</td>' +
-        '<td style="font-family:var(--mono);font-size:11px">' + (s.protocolo || '—').slice(0, 28) + '</td>' +
         '<td style="font-size:12px">' + et + '</td>' +
         '<td>' + badgeSt + '</td>' +
         '<td style="font-family:var(--mono);color:var(--text3)">' + (s.ano || '—') + '</td>' +
+        '<td style="font-size:12px">' + vencLabel + '</td>' +
         '<td style="font-size:12px">' + attLabel + '</td>' +
         '<td style="font-size:12px;color:var(--text3)">' + (s.observacao || '—').slice(0, 25) + '</td>' +
         '</tr>'
@@ -359,6 +439,6 @@ const Suspensoes = (() => {
 
   return {
     render, renderLista, abrirDetalhe, abrirNova,
-    acFiltrar, acFechar
+    acFiltrar, acFechar, sortBy
   }
 })()
