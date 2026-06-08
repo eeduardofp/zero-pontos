@@ -106,7 +106,10 @@
 <div class="page" id="pg-aits">
   <div class="page-header">
     <div><div class="page-title">AITs</div><div class="page-sub" id="aits-sub"></div></div>
-    <button class="btn btn-primary" onclick="nav('cadastro')">+ Nova AIT</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="exportarAITs()">↓ Exportar Excel</button>
+      <button class="btn btn-primary" onclick="nav('cadastro')">+ Nova AIT</button>
+    </div>
   </div>
   <div class="search-box">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -283,7 +286,10 @@
 <div class="page" id="pg-suspensoes">
   <div class="page-header">
     <div><div class="page-title">Suspensões</div><div class="page-sub" id="sus-count"></div></div>
-    <button class="btn btn-primary" onclick="Suspensoes.abrirNova()">+ Nova suspensão</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="exportarSuspensoes()">↓ Exportar Excel</button>
+      <button class="btn btn-primary" onclick="Suspensoes.abrirNova()">+ Nova suspensão</button>
+    </div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
     <div class="search-box" style="margin-bottom:0;flex:1;min-width:260px">
@@ -332,6 +338,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="data.js"></script>
