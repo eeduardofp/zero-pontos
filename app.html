@@ -38,6 +38,9 @@
     <a data-page="financeiro" onclick="nav('financeiro')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Financeiro
     </a>
+    <a data-page="suspensoes" onclick="nav('suspensoes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Suspensões
+    </a>
     <a data-page="comercial" onclick="nav('comercial')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Comercial
     </a>
@@ -277,6 +280,47 @@
   <div id="com-board"></div>
 </div>
 
+<div class="page" id="pg-suspensoes">
+  <div class="page-header">
+    <div><div class="page-title">Suspensões</div><div class="page-sub" id="sus-count"></div></div>
+    <button class="btn btn-primary" onclick="Suspensoes.abrirNova()">+ Nova suspensão</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div class="search-box" style="margin-bottom:0;flex:1;min-width:260px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="sus-q" placeholder="Buscar por nome, processo, protocolo, senha, status, observação..." oninput="Suspensoes.renderLista(1)" autocomplete="off">
+    </div>
+    <div class="filters" style="margin-bottom:0">
+      <button class="fbtn on" onclick="UI.setFiltro(this,'sus-status','todos',()=>Suspensoes.renderLista(1))">Todos</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'sus-status','ativo',()=>Suspensoes.renderLista(1))">Ativos</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'sus-status','Aguardando',()=>Suspensoes.renderLista(1))">Aguardando</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'sus-status','Indeferido',()=>Suspensoes.renderLista(1))">Indeferido</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'sus-status','Deferido',()=>Suspensoes.renderLista(1))">Deferido</button>
+      <button class="fbtn" onclick="UI.setFiltro(this,'sus-status','encerrado',()=>Suspensoes.renderLista(1))">Encerrados</button>
+    </div>
+    <input type="hidden" id="sus-status" value="todos">
+    <select class="form-ctrl" id="sus-ano" onchange="Suspensoes.renderLista(1)" style="width:110px;padding:5px 10px;font-size:12px">
+      <option value="todos">Todos os anos</option>
+    </select>
+  </div>
+  <div class="tbl-wrap">
+    <table style="table-layout:fixed">
+      <thead><tr>
+        <th style="width:20%">Cliente</th>
+        <th style="width:110px">Processo</th>
+        <th style="width:22%">Protocolo</th>
+        <th style="width:100px">Etapa</th>
+        <th style="width:100px">Status</th>
+        <th style="width:55px">Ano</th>
+        <th style="width:80px">Últ. att.</th>
+        <th>Observação</th>
+      </tr></thead>
+      <tbody id="sus-tbody"></tbody>
+    </table>
+  </div>
+  <div class="pager" id="sus-pager"></div>
+</div>
+
 </div><!-- end main -->
 
 <!-- MODAL -->
@@ -294,6 +338,7 @@
 <script src="ui.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
+<script src="suspensoes.js"></script>
 <script src="comercial.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', initApp)
