@@ -62,11 +62,18 @@ async function extractRecursos(page) {
       })
       return {
         processo: campos['Processo'] || '',
+        requerimento: campos['Requerimento'] || '',
         resultado: campos['Resultado do Processo'] || '',
         texto: card.textContent.replace(/\s+/g, ' ')
       }
     }), SEL
-  ).then(cards => cards.map(c => ({ ...c, instancia: instanciaDoProcesso(c.processo) })))
+  ).then(cards => cards.map(c => ({
+    ...c,
+    instancia: instanciaDoProcesso(c.processo),
+    // data do requerimento ("Em 29/04/2026 pelo...") — usada para ordenar
+    // processos do mesmo auto: o site lista mais novo primeiro
+    dataRequerimento: M.parseDataBR((/(\d{1,2}\/\d{1,2}\/\d{4})/.exec(c.requerimento) || [])[1] || '')
+  })))
 }
 
 // Lê débitos da página atual do accordion DÉBITOS.

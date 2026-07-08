@@ -21,6 +21,17 @@ function mapResultado(resultadoSite) {
   return { status: regra.status, precisaDataLimite: regra.status === 'Indeferido' }
 }
 
+// Casamento de código de AIT: maiúsculas e sem espaços dos dois lados —
+// o site às vezes insere espaço dentro do código (ex.: "1V 5379787").
+function normalizar(s) {
+  return (s || '').toUpperCase().replace(/\s+/g, '')
+}
+
+function contemCodigo(texto, codigo) {
+  if (!codigo) return false
+  return normalizar(texto).includes(normalizar(codigo))
+}
+
 function parseDataBR(txt) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((txt || '').trim())
   if (!m) return null
@@ -56,4 +67,4 @@ function montarUpdate(ait, achados) {
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, contemCodigo }

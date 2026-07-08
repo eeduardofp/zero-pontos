@@ -30,13 +30,16 @@ async function processarPlaca(page, placa, aits, itens, clientes) {
   const debitos = precisaDebitos ? await D.todosDebitos(page) : []
 
   for (const ait of aits) {
-    // cards do site que citam o código desta AIT e pertencem a uma etapa da esteira
+    // cards do site que citam o código desta AIT e pertencem a uma etapa da esteira.
+    // Ordena do mais antigo para o mais novo: com dois processos na mesma
+    // instância, o mais recente sobrescreve por último no montarUpdate.
     const achados = recursos
-      .filter(r => r.instancia && r.texto.includes(ait.codigo))
+      .filter(r => r.instancia && M.contemCodigo(r.texto, ait.codigo))
+      .sort((a, b) => (a.dataRequerimento || '').localeCompare(b.dataRequerimento || ''))
       .map(r => ({
         instancia: r.instancia,
         resultado: r.resultado,
-        dataLimite: (debitos.find(d => d.texto.includes(ait.codigo)) || {}).data || null
+        dataLimite: (debitos.find(d => M.contemCodigo(d.texto, ait.codigo)) || {}).data || null
       }))
     const up = M.montarUpdate(ait, achados)
     const antes = STATUS_LABEL(ait)

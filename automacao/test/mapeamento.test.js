@@ -33,6 +33,14 @@ test('mapResultado retorna null para texto desconhecido', () => {
   assert.strictEqual(M.mapResultado(null), null)
 })
 
+test('contemCodigo ignora espaços e caixa (site insere espaço no código)', () => {
+  assert.ok(M.contemCodigo('Identificador do AutoUF:SP-126200-1V 5379787-7455-0', '1V5379787'))
+  assert.ok(M.contemCodigo('UF:RD-000100-R855283197-7455Vencimento 11/07/2025', 'R855283197'))
+  assert.ok(M.contemCodigo('numero n004330074 aqui', 'N004330074'))
+  assert.ok(!M.contemCodigo('UF:RD-000100-R855283197-7455', 'N004330074'))
+  assert.ok(!M.contemCodigo('qualquer texto', ''))
+})
+
 test('parseDataBR converte dd/mm/aaaa para aaaa-mm-dd', () => {
   assert.strictEqual(M.parseDataBR('19/08/2026'), '2026-08-19')
   assert.strictEqual(M.parseDataBR('5/3/2026'), '2026-03-05')

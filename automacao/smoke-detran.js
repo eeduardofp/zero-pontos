@@ -13,6 +13,11 @@ async function main() {
   console.log('recursos:', JSON.stringify(await D.todosRecursos(page), null, 1))
   console.log('débitos:', JSON.stringify(await D.todosDebitos(page), null, 1))
   await page.screenshot({ path: 'logs/smoke-final.png', fullPage: true })
+  // salva fixture para o suite de testes
+  const fs = require('fs')
+  fs.mkdirSync('fixtures', { recursive: true })
+  fs.writeFileSync(`fixtures/dossie-${placa}.html`, await page.content())
+  console.log(`fixture salva: fixtures/dossie-${placa}.html`)
   await ctx.close()
 }
 main().catch(e => { console.error(e); process.exit(1) })
