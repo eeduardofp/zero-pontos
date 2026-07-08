@@ -123,15 +123,30 @@ async function garantirLogado(page) {
   await page.waitForLoadState('networkidle').catch(() => {})
 }
 
-// Garante que um accordion está expandido (conteúdo carrega ao abrir)
+// Garante que um accordion está expandido E com conteúdo carregado.
+// O container .accordion-content pode existir no DOM fechado e vazio —
+// o conteúdo só é buscado na rede quando o header é clicado. Por isso a
+// decisão é por visibilidade, e a espera é por conteúdo real (cards ou
+// mensagem de vazio), não por tempo fixo.
 async function abrirAccordion(page, tituloRe) {
   const acc = accordionPorTitulo(page, tituloRe)
   if (await acc.count() === 0) return false
-  const temConteudo = await acc.locator('.accordion-content').count()
-  if (!temConteudo) {
-    await acc.locator(SEL.accordionHeader).click()
-    await page.waitForTimeout(800)
+
+  const conteudo = acc.locator('.accordion-content')
+  const visivel = await conteudo.first().isVisible().catch(() => false)
+  if (!visivel) {
+    await acc.locator(SEL.accordionHeader).first().click()
   }
+
+  // espera carregar: algum card OU texto de "nenhum registro"
+  const inicio = Date.now()
+  while (Date.now() - inicio < 20000) {
+    if (await acc.locator(SEL.card).count() > 0) return true
+    const txt = await conteudo.first().innerText().catch(() => '')
+    if (txt.trim().length > 0) return true
+    await page.waitForTimeout(500)
+  }
+  console.log(`  aviso: accordion ${tituloRe} não carregou conteúdo em 20s`)
   return true
 }
 
