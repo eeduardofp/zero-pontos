@@ -617,11 +617,17 @@ const BASE = 'https://servicos.detran.sc.gov.br/consulta-dossie-veiculo'
 const PROFILE = path.join(__dirname, 'chrome-profile')
 const LOGS = path.join(__dirname, 'logs')
 
+// Flags anti-detecção: sem elas o captcha do login rejeita solução correta
+// (navigator.webdriver=true denuncia automação — visto na Etapa 0).
+// Login NUNCA deve acontecer sob automação: usuário loga via `captura.js --login`
+// (Chrome puro, mesmo perfil) e o Playwright só reaproveita a sessão.
 async function abrirBrowser() {
   const ctx = await chromium.launchPersistentContext(PROFILE, {
     channel: 'chrome',
     headless: false,
-    viewport: null
+    viewport: null,
+    ignoreDefaultArgs: ['--enable-automation'],
+    args: ['--disable-blink-features=AutomationControlled']
   })
   return { ctx, page: ctx.pages()[0] || await ctx.newPage() }
 }
