@@ -20,8 +20,9 @@ const SEL = {
   item: '.lista-dados__item',
   itemTitulo: '.lista-dados__item--title',
   paginacao: '.paginacao',
-  // PROVISÓRIO: sem fixture de erro de permissão ainda — calibrar quando capturada
-  erroPermissao: /não possui permissão|sem permissão|não autorizado|não tem acesso/i,
+  // Mensagem real capturada (fixture dossie-MKK3J84-protegido.html):
+  // "Erro ao consultar dossiê de veículo O veículo consultado está protegido."
+  erroPermissao: /ve[íi]culo consultado est[áa] protegido|não possui permissão|sem permissão|não autorizado/i,
   debitosVazio: '.lista-debitos--empty'
 }
 

@@ -68,6 +68,11 @@ test('extractDebitos: fixture sem débitos retorna vazio', async () => {
   assert.deepStrictEqual(debitos, [])
 })
 
+test('isPermissaoNegada detecta veículo protegido (fixture real)', async () => {
+  await carregarFixture('dossie-MKK3J84-protegido.html')
+  assert.strictEqual(await D.isPermissaoNegada(page), true)
+})
+
 test('isPermissaoNegada é falso em dossiê normal', async () => {
   await carregarFixture('dossie-MJL0H67.html')
   assert.strictEqual(await D.isPermissaoNegada(page), false)
