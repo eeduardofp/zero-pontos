@@ -3,7 +3,14 @@
 // Seletores calibrados pelas fixtures capturadas na Etapa 0 (captura.js).
 // Estrutura real: seções em accordions (.accordion), cards em
 // .box-destaque.lista-dados com pares .lista-dados__item--title / <p>.
+const { chromium } = require('playwright')
+const fs = require('fs')
+const path = require('path')
 const M = require('./mapeamento.js')
+
+const BASE = 'https://servicos.detran.sc.gov.br/consulta-dossie-veiculo'
+const PROFILE = path.join(__dirname, 'chrome-profile')
+const LOGS = path.join(__dirname, 'logs')
 
 const SEL = {
   accordion: '.accordion',
@@ -87,4 +94,114 @@ async function isPermissaoNegada(page) {
   return SEL.erroPermissao.test(corpo)
 }
 
-module.exports = { extractRecursos, extractDebitos, isPermissaoNegada, instanciaDoProcesso, SEL }
+// ─── NAVEGAÇÃO ───────────────────────────────────────────────
+
+// Flags anti-detecção: sem elas o captcha do login rejeita solução correta
+// (navigator.webdriver=true denuncia automação). Login em si nunca acontece
+// sob automação — usuário loga via `captura.js --login` e a sessão fica no perfil.
+async function abrirBrowser() {
+  const ctx = await chromium.launchPersistentContext(PROFILE, {
+    channel: 'chrome',
+    headless: false,
+    viewport: null,
+    ignoreDefaultArgs: ['--enable-automation'],
+    args: ['--disable-blink-features=AutomationControlled']
+  })
+  return { ctx, page: ctx.pages()[0] || await ctx.newPage() }
+}
+
+// Se o site redirecionar para login, espera o usuário logar manualmente.
+function emTelaDeLogin(page) {
+  return /login|sso|acesso|auth/i.test(page.url()) && !page.url().includes('consulta-dossie')
+}
+
+async function garantirLogado(page) {
+  if (!emTelaDeLogin(page)) return
+  console.log('\n*** Sessão expirou. Faça login no Detran Digital na janela do Chrome. ***')
+  console.log('*** A automação continua sozinha depois do login. ***')
+  while (emTelaDeLogin(page)) await page.waitForTimeout(2000)
+  await page.waitForLoadState('networkidle').catch(() => {})
+}
+
+// Garante que um accordion está expandido (conteúdo carrega ao abrir)
+async function abrirAccordion(page, tituloRe) {
+  const acc = accordionPorTitulo(page, tituloRe)
+  if (await acc.count() === 0) return false
+  const temConteudo = await acc.locator('.accordion-content').count()
+  if (!temConteudo) {
+    await acc.locator(SEL.accordionHeader).click()
+    await page.waitForTimeout(800)
+  }
+  return true
+}
+
+// Percorre todas as páginas de um accordion paginado, acumulando via extrator
+async function extrairComPaginacao(page, tituloRe, extrator) {
+  const acc = accordionPorTitulo(page, tituloRe)
+  if (await acc.count() === 0) return []
+  const out = [...await extrator(page)]
+  const proximo = () => acc.locator(`${SEL.paginacao} button:not([disabled])`).filter({
+    has: page.locator('.fa-arrow-right')
+  })
+  let paginas = 1
+  while (await proximo().count() > 0 && paginas < 50) {
+    await proximo().first().click()
+    await page.waitForTimeout(800)
+    out.push(...await extrator(page))
+    paginas++
+  }
+  return out
+}
+
+// Abre o dossiê de uma placa e deixa as seções necessárias prontas.
+// Fluxo real do site: a URL pré-preenche o formulário, mas é preciso clicar
+// em CONSULTAR DOSSIÊ VEÍCULO; o dossiê demora alguns segundos para montar.
+async function abrirDossie(page, placa, renavam) {
+  await page.goto(`${BASE}?placa=${placa}&renavam=${renavam}`, { waitUntil: 'domcontentloaded' })
+  await garantirLogado(page)
+
+  const btnConsultar = page.locator('button').filter({ hasText: /CONSULTAR DOSSI/i }).first()
+  await btnConsultar.waitFor({ timeout: 30000 })
+
+  // Confere/preenche o formulário caso a URL não tenha pré-preenchido
+  const campos = page.locator('input[type="text"]:visible')
+  if (await campos.count() >= 2) {
+    if ((await campos.nth(0).inputValue()) !== placa) await campos.nth(0).fill(placa)
+    if ((await campos.nth(1).inputValue()) !== String(renavam)) await campos.nth(1).fill(String(renavam))
+  }
+  await btnConsultar.click()
+
+  // Espera dossiê montar (accordions) OU erro de permissão — backend é lento
+  const inicio = Date.now()
+  while (Date.now() - inicio < 60000) {
+    if (await page.locator(SEL.accordion).count() > 0) break
+    if (await isPermissaoNegada(page)) return
+    await page.waitForTimeout(1000)
+  }
+  if (await page.locator(SEL.accordion).count() === 0) {
+    if (await isPermissaoNegada(page)) return
+    throw new Error('Dossiê não carregou em 60s')
+  }
+  await abrirAccordion(page, /RECURSOS DE INFRA/i)
+  await abrirAccordion(page, /D[ÉE]BITOS/i)
+}
+
+// Recursos e débitos completos (todas as páginas)
+function todosRecursos(page) {
+  return extrairComPaginacao(page, /RECURSOS DE INFRA/i, extractRecursos)
+}
+function todosDebitos(page) {
+  return extrairComPaginacao(page, /D[ÉE]BITOS/i, extractDebitos)
+}
+
+async function screenshotErro(page, placa) {
+  fs.mkdirSync(LOGS, { recursive: true })
+  const arq = path.join(LOGS, `erro-${placa}-${Date.now()}.png`)
+  try { await page.screenshot({ path: arq, fullPage: true }) } catch {}
+  return arq
+}
+
+module.exports = {
+  extractRecursos, extractDebitos, isPermissaoNegada, instanciaDoProcesso, SEL,
+  abrirBrowser, garantirLogado, abrirDossie, todosRecursos, todosDebitos, screenshotErro
+}
