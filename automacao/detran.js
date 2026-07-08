@@ -23,6 +23,9 @@ const SEL = {
   // Mensagem real capturada (fixture dossie-MKK3J84-protegido.html):
   // "Erro ao consultar dossiê de veículo O veículo consultado está protegido."
   erroPermissao: /ve[íi]culo consultado est[áa] protegido|não possui permissão|sem permissão|não autorizado/i,
+  // Limite de consultas do Detran atingido (texto amplo — refinar se aparecer
+  // variação; classificarDossie salva o texto real em logs quando não classifica).
+  limiteConsultas: /limite (de|diário de|máximo de)? ?consultas|consultas? (excedid|atingid|esgotad)|número máximo de consultas|quantidade máxima de consultas|excedeu o limite/i,
   debitosVazio: '.lista-debitos--empty'
 }
 
@@ -176,9 +179,25 @@ async function extrairComPaginacao(page, tituloRe, extrator) {
   return out
 }
 
+async function isLimiteAtingido(page) {
+  const corpo = await page.locator('body').innerText().catch(() => '')
+  return SEL.limiteConsultas.test(corpo)
+}
+
+// Classifica o desfecho da consulta na tela atual.
+// → 'ok' | 'protegido' | 'limite' | 'erro'
+async function classificarDossie(page) {
+  if (await page.locator(SEL.accordion).count() > 0) return 'ok'
+  if (await isPermissaoNegada(page)) return 'protegido'
+  if (await isLimiteAtingido(page)) return 'limite'
+  return 'erro'
+}
+
 // Abre o dossiê de uma placa e deixa as seções necessárias prontas.
 // Fluxo real do site: a URL pré-preenche o formulário, mas é preciso clicar
 // em CONSULTAR DOSSIÊ VEÍCULO; o dossiê demora alguns segundos para montar.
+// Retorna: { status: 'ok'|'protegido'|'limite'|'erro', texto } — nunca lança
+// por desfecho de negócio; o orquestrador decide o que fazer com cada status.
 async function abrirDossie(page, placa, renavam) {
   await page.goto(`${BASE}?placa=${placa}&renavam=${renavam}`, { waitUntil: 'domcontentloaded' })
   await garantirLogado(page)
@@ -194,19 +213,24 @@ async function abrirDossie(page, placa, renavam) {
   }
   await btnConsultar.click()
 
-  // Espera dossiê montar (accordions) OU erro de permissão — backend é lento
+  // Espera um desfecho: accordions (ok), protegido, ou limite — backend é lento
   const inicio = Date.now()
+  let status = 'erro'
   while (Date.now() - inicio < 60000) {
-    if (await page.locator(SEL.accordion).count() > 0) break
-    if (await isPermissaoNegada(page)) return
+    status = await classificarDossie(page)
+    if (status !== 'erro') break
     await page.waitForTimeout(1000)
   }
-  if (await page.locator(SEL.accordion).count() === 0) {
-    if (await isPermissaoNegada(page)) return
-    throw new Error('Dossiê não carregou em 60s')
+
+  if (status === 'ok') {
+    await abrirAccordion(page, /RECURSOS DE INFRA/i)
+    await abrirAccordion(page, /D[ÉE]BITOS/i)
+    return { status: 'ok', texto: '' }
   }
-  await abrirAccordion(page, /RECURSOS DE INFRA/i)
-  await abrirAccordion(page, /D[ÉE]BITOS/i)
+
+  // Desfecho não-ok: guarda o texto visível para diagnóstico/refino
+  const texto = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 400)
+  return { status, texto }
 }
 
 // Recursos e débitos completos (todas as páginas)
@@ -225,6 +249,7 @@ async function screenshotErro(page, placa) {
 }
 
 module.exports = {
-  extractRecursos, extractDebitos, isPermissaoNegada, instanciaDoProcesso, SEL,
+  extractRecursos, extractDebitos, isPermissaoNegada, isLimiteAtingido, classificarDossie,
+  instanciaDoProcesso, SEL,
   abrirBrowser, garantirLogado, abrirDossie, todosRecursos, todosDebitos, screenshotErro
 }

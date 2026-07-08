@@ -32,6 +32,28 @@ function contemCodigo(texto, codigo) {
   return normalizar(texto).includes(normalizar(codigo))
 }
 
+// Cadastro guarda a placa com sufixo de UF ("QJC8G88/SC") e às vezes com
+// separadores. O site quer só os 7 caracteres. Limpa: tira o que vem depois
+// da barra, remove não-alfanuméricos e sobe para maiúsculas.
+function limparPlaca(p) {
+  return (p == null ? '' : String(p)).split('/')[0].replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+}
+
+function limparRenavam(r) {
+  return (r == null ? '' : String(r)).replace(/\D/g, '')
+}
+
+// Placa: 7 caracteres alfanuméricos (antigo ABC1234 ou Mercosul ABC1D23),
+// validada já limpa. Filtra cadastros com lixo (ex.: "TOXICOLOGICO").
+function placaValida(p) {
+  return /^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$/.test(limparPlaca(p))
+}
+
+// Renavam: 9 a 11 dígitos, validado já limpo.
+function renavamValido(r) {
+  return /^\d{9,11}$/.test(limparRenavam(r))
+}
+
 function parseDataBR(txt) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((txt || '').trim())
   if (!m) return null
@@ -67,4 +89,4 @@ function montarUpdate(ait, achados) {
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, contemCodigo }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido }

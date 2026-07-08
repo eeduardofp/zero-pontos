@@ -41,6 +41,42 @@ test('contemCodigo ignora espaços e caixa (site insere espaço no código)', ()
   assert.ok(!M.contemCodigo('qualquer texto', ''))
 })
 
+test('limparPlaca remove sufixo /UF e separadores (cadastro guarda "QJC8G88/SC")', () => {
+  assert.strictEqual(M.limparPlaca('QJC8G88/SC'), 'QJC8G88')
+  assert.strictEqual(M.limparPlaca(' mjl0h67 '), 'MJL0H67')
+  assert.strictEqual(M.limparPlaca('ABC-1234'), 'ABC1234')
+  assert.strictEqual(M.limparPlaca('RYT0A74/PR'), 'RYT0A74')
+})
+
+test('limparRenavam mantém só dígitos', () => {
+  assert.strictEqual(M.limparRenavam('489968520'), '489968520')
+  assert.strictEqual(M.limparRenavam('1.390.381.657'), '1390381657')
+  assert.strictEqual(M.limparRenavam(489968520), '489968520')
+})
+
+test('placaValida aceita formatos antigo e Mercosul (após limpeza)', () => {
+  assert.ok(M.placaValida('MJL0H67'))
+  assert.ok(M.placaValida('ABC1234'))
+  assert.ok(M.placaValida('QJC8G88/SC'))
+  assert.ok(M.placaValida(' ryt0a74 '))
+})
+
+test('placaValida rejeita lixo do cadastro', () => {
+  assert.ok(!M.placaValida('TOXICOLOGICO'))
+  assert.ok(!M.placaValida('ABC12'))
+  assert.ok(!M.placaValida(''))
+  assert.ok(!M.placaValida(null))
+})
+
+test('renavamValido aceita 9 a 11 dígitos (após limpeza)', () => {
+  assert.ok(M.renavamValido('489968520'))
+  assert.ok(M.renavamValido(1390381657))
+  assert.ok(M.renavamValido('1.390.381.657'))
+  assert.ok(!M.renavamValido('12345'))
+  assert.ok(!M.renavamValido('sem renavam'))
+  assert.ok(!M.renavamValido(null))
+})
+
 test('parseDataBR converte dd/mm/aaaa para aaaa-mm-dd', () => {
   assert.strictEqual(M.parseDataBR('19/08/2026'), '2026-08-19')
   assert.strictEqual(M.parseDataBR('5/3/2026'), '2026-03-05')

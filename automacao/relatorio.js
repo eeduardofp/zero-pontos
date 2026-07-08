@@ -3,16 +3,33 @@ const fs = require('fs')
 const path = require('path')
 const { execSync } = require('child_process')
 
+const COR = {
+  atualizado: '#16a34a',
+  'sem-mudanca': '#64748b',
+  'nao-encontrado': '#d97706',
+  'sem-permissao': '#dc2626',
+  'pulado-protegido': '#a855f7',
+  'dados-invalidos': '#eab308',
+  limite: '#f97316',
+  erro: '#dc2626'
+}
+
+// Caminho único por execução — permite regravar o mesmo arquivo a cada placa
+// (relatório incremental: sobrevive a interrupção/limite no meio da rodada).
+function novoCaminho() {
+  const dir = path.join(__dirname, 'logs')
+  fs.mkdirSync(dir, { recursive: true })
+  return path.join(dir, `relatorio-${new Date().toISOString().replace(/[:.]/g, '-')}.html`)
+}
+
 // itens: [{ cliente, placa, codigo, tipo, antes, depois, vencimento, detalhe }]
-// tipo: 'atualizado' | 'sem-mudanca' | 'nao-encontrado' | 'sem-permissao' | 'erro'
-function gerar(itens, dryRun) {
-  const cor = { atualizado: '#16a34a', 'sem-mudanca': '#64748b', 'nao-encontrado': '#d97706', 'sem-permissao': '#dc2626', erro: '#dc2626' }
+function gerar(itens, dryRun, arqFixo) {
   const resumo = {}
   for (const i of itens) resumo[i.tipo] = (resumo[i.tipo] || 0) + 1
 
   const linhas = itens.map(i => `<tr>
     <td>${i.cliente || '—'}</td><td>${i.placa || '—'}</td><td>${i.codigo || '—'}</td>
-    <td style="color:${cor[i.tipo] || '#64748b'};font-weight:600">${i.tipo}</td>
+    <td style="color:${COR[i.tipo] || '#64748b'};font-weight:600">${i.tipo}</td>
     <td>${i.antes || '—'}</td><td>${i.depois || '—'}</td>
     <td>${i.vencimento || '—'}</td><td>${i.detalhe || ''}</td></tr>`).join('')
 
@@ -28,9 +45,7 @@ ${dryRun ? '<div class="aviso"><b>DRY-RUN:</b> nada foi gravado no workspace.</d
 <table><tr><th>Cliente</th><th>Placa</th><th>AIT</th><th>Resultado</th><th>Antes</th><th>Depois</th><th>Vencimento</th><th>Detalhe</th></tr>
 ${linhas}</table></body></html>`
 
-  const dir = path.join(__dirname, 'logs')
-  fs.mkdirSync(dir, { recursive: true })
-  const arq = path.join(dir, `relatorio-${new Date().toISOString().replace(/[:.]/g, '-')}.html`)
+  const arq = arqFixo || novoCaminho()
   fs.writeFileSync(arq, html)
   return arq
 }
@@ -39,4 +54,4 @@ function abrir(arq) {
   try { execSync(`start "" "${arq}"`, { shell: 'cmd.exe' }) } catch {}
 }
 
-module.exports = { gerar, abrir }
+module.exports = { gerar, abrir, novoCaminho }
