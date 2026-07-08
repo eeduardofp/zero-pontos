@@ -4,7 +4,7 @@
   "private": true,
   "description": "Consulta de recursos no Detran Digital SC e atualização do workspace",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "captura": "node captura.js",
     "consultar": "node index.js",
     "dry-run": "node index.js --dry-run"
