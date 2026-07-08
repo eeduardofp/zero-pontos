@@ -1,5 +1,6 @@
 // ─── CONSULTA DE RECURSOS ────────────────────────────────────
 // Uso: node index.js [--dry-run]
+const readline = require('readline')
 const S = require('./supabase.js')
 const D = require('./detran.js')
 const M = require('./mapeamento.js')
@@ -8,24 +9,17 @@ const Bloq = require('./bloqueios.js')
 
 const DRY = process.argv.includes('--dry-run')
 const PAUSA_ENTRE_PLACAS_MS = 3000
-const PAUSA_LIMITE_MS = 20 * 60 * 1000   // espera quando o Detran barra por limite
-const MAX_PAUSAS_LIMITE = 6               // teto de pausas antes de encerrar a rodada
+const MAX_TROCAS_LIMITE = 10   // teto de trocas de conta antes de encerrar a rodada
 
 const STATUS_LABEL = a =>
   `DP:${a.defesa_previa || '—'} | JARI:${a.jari || '—'} | 2ª:${a.segunda_instancia || '—'}`
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-// Pausa com contagem regressiva no console (usada no limite de consultas)
-async function pausarComContagem(ms, motivo) {
-  const fim = Date.now() + ms
-  console.log(`\n⏸  ${motivo}`)
-  while (Date.now() < fim) {
-    const restaMin = Math.ceil((fim - Date.now()) / 60000)
-    process.stdout.write(`\r   retomando em ~${restaMin} min...   `)
-    await sleep(Math.min(30000, fim - Date.now()))
-  }
-  console.log('\n▶  retomando.\n')
+// Espera o usuário teclar ENTER no console (gate de login / troca de conta)
+function esperarEnter(msg) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  return new Promise(res => rl.question(msg, () => { rl.close(); res() }))
 }
 
 // Consulta o dossiê e devolve os itens de relatório para as AITs desta placa.
@@ -84,7 +78,13 @@ async function main() {
     porPlaca.get(a.placa_id).push(a)
   }
 
+  // Login obrigatório e limpo a cada execução: apaga a sessão anterior antes
+  // de abrir o browser, para você poder entrar com a conta que quiser.
+  D.limparSessao()
   const { ctx, page } = await D.abrirBrowser()
+  await D.irParaInicio(page)
+  await esperarEnter('\n>>> Faça login no Detran Digital na janela do Chrome e tecle ENTER para começar... ')
+
   const itens = []
   const arqRelatorio = R.novoCaminho()   // caminho fixo — regravado a cada placa
   const flush = () => R.gerar(itens, DRY, arqRelatorio)
@@ -99,7 +99,7 @@ async function main() {
 
   const fila = [...porPlaca.keys()]
   let n = 0
-  let pausasLimite = 0
+  let trocasLimite = 0
 
   for (let idx = 0; idx < fila.length; idx++) {
     const placaId = fila[idx]
@@ -165,10 +165,11 @@ async function main() {
         marcarTodas(placa, 'sem-permissao', 'Veículo protegido — cliente não autorizou (flagada para próximas rodadas)')
         resolvido = true
       } else if (desfecho.status === 'limite') {
-        // (3) limite atingido → pausa e RETENTA a mesma placa
-        pausasLimite++
-        if (pausasLimite > MAX_PAUSAS_LIMITE) {
-          console.log('\nLimite de consultas persistente após várias pausas. Encerrando rodada.')
+        // (3) limite atingido → oferece TROCAR DE CONTA e RETENTA a mesma placa.
+        // Apaga a sessão para forçar novo login com outra conta.
+        trocasLimite++
+        if (trocasLimite > MAX_TROCAS_LIMITE) {
+          console.log('\nLimite atingido em várias contas seguidas. Encerrando rodada.')
           marcarTodas(placa, 'limite', 'Limite persistente — placa não consultada nesta rodada')
           flush()
           await ctx.close()
@@ -177,7 +178,12 @@ async function main() {
           console.log('Rode de novo mais tarde: placas já feitas saem rápido, protegidas são puladas.')
           return
         }
-        await pausarComContagem(PAUSA_LIMITE_MS, `Limite de consultas do Detran atingido (pausa ${pausasLimite}/${MAX_PAUSAS_LIMITE}).`)
+        console.log(`\n⚠  Limite de consultas atingido nesta conta (troca ${trocasLimite}/${MAX_TROCAS_LIMITE}).`)
+        // desloga a conta atual sem fechar o Chrome
+        await ctx.clearCookies().catch(() => {})
+        await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} }).catch(() => {})
+        await D.irParaInicio(page)
+        await esperarEnter('>>> Faça login com OUTRA conta na janela e tecle ENTER para continuar de onde parou... ')
         // não marca resolvido → volta ao while e reconsulta a mesma placa
       } else {
         // desfecho desconhecido — guarda texto p/ refino e segue

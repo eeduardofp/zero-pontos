@@ -107,9 +107,15 @@ async function isPermissaoNegada(page) {
 
 // ─── NAVEGAÇÃO ───────────────────────────────────────────────
 
+// Apaga a sessão salva (perfil do Chrome) para forçar login limpo a cada
+// execução. Chamado antes de abrir o browser — permite trocar de conta.
+function limparSessao() {
+  try { fs.rmSync(PROFILE, { recursive: true, force: true }) } catch {}
+}
+
 // Flags anti-detecção: sem elas o captcha do login rejeita solução correta
-// (navigator.webdriver=true denuncia automação). Login em si nunca acontece
-// sob automação — usuário loga via `captura.js --login` e a sessão fica no perfil.
+// (navigator.webdriver=true denuncia automação). Com elas, o login manual
+// na janela funciona normalmente (captcha inclusive).
 async function abrirBrowser() {
   const ctx = await chromium.launchPersistentContext(PROFILE, {
     channel: 'chrome',
@@ -119,6 +125,11 @@ async function abrirBrowser() {
     args: ['--disable-blink-features=AutomationControlled']
   })
   return { ctx, page: ctx.pages()[0] || await ctx.newPage() }
+}
+
+// Abre a página de consulta (tela onde o site pede login se não houver sessão).
+async function irParaInicio(page) {
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' }).catch(() => {})
 }
 
 // Se o site redirecionar para login, espera o usuário logar manualmente.
@@ -251,5 +262,6 @@ async function screenshotErro(page, placa) {
 module.exports = {
   extractRecursos, extractDebitos, isPermissaoNegada, isLimiteAtingido, classificarDossie,
   instanciaDoProcesso, SEL,
-  abrirBrowser, garantirLogado, abrirDossie, todosRecursos, todosDebitos, screenshotErro
+  abrirBrowser, limparSessao, irParaInicio, garantirLogado, abrirDossie,
+  todosRecursos, todosDebitos, screenshotErro
 }
