@@ -15,6 +15,18 @@ test('mapResultado tolera caixa e espaços', () => {
   assert.strictEqual(M.mapResultado('efeito suspensivo').status, 'Aguardando')
 })
 
+test('mapResultado aceita texto real do site (prefixo "Processo")', () => {
+  assert.strictEqual(M.mapResultado('Processo Cadastrado sem decisão').status, 'Aguardando')
+  assert.strictEqual(M.mapResultado('Processo Indeferido').status, 'Indeferido')
+  assert.strictEqual(M.mapResultado('Processo Deferido').status, 'Deferido')
+  assert.strictEqual(M.mapResultado('Processo Não conhecido').status, 'Indeferido')
+})
+
+test('mapResultado não confunde Indeferido com Deferido', () => {
+  assert.strictEqual(M.mapResultado('Processo Indeferido').status, 'Indeferido')
+  assert.strictEqual(M.mapResultado('INDEFERIDO').status, 'Indeferido')
+})
+
 test('mapResultado retorna null para texto desconhecido', () => {
   assert.strictEqual(M.mapResultado('Em análise pelo órgão'), null)
   assert.strictEqual(M.mapResultado(''), null)

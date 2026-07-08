@@ -2,21 +2,23 @@
 // Regras puras: resultado do site Detran → campos da AIT no workspace.
 // Sem I/O — tudo testável.
 
-const MAPA_RESULTADO = {
-  'indeferido': 'Indeferido',
-  'não conhecido': 'Indeferido',
-  'nao conhecido': 'Indeferido',
-  'deferido': 'Deferido',
-  'cadastrado sem decisão': 'Aguardando',
-  'cadastrado sem decisao': 'Aguardando',
-  'efeito suspensivo': 'Aguardando'
-}
+// Site exibe "Processo <resultado>" — casar por conteúdo, em ordem:
+// "não conhecido" e "indeferido" antes de "deferido" (substring); \b impede
+// que "Indeferido" case com /deferido/.
+const REGRAS_RESULTADO = [
+  { re: /n[ãa]o conhecido/i, status: 'Indeferido' },
+  { re: /indeferido/i, status: 'Indeferido' },
+  { re: /\bdeferido/i, status: 'Deferido' },
+  { re: /cadastrado sem decis/i, status: 'Aguardando' },
+  { re: /efeito suspensivo/i, status: 'Aguardando' }
+]
 
 function mapResultado(resultadoSite) {
-  const chave = (resultadoSite || '').trim().toLowerCase()
-  const status = MAPA_RESULTADO[chave]
-  if (!status) return null
-  return { status, precisaDataLimite: status === 'Indeferido' }
+  const txt = (resultadoSite || '').trim()
+  if (!txt) return null
+  const regra = REGRAS_RESULTADO.find(r => r.re.test(txt))
+  if (!regra) return null
+  return { status: regra.status, precisaDataLimite: regra.status === 'Indeferido' }
 }
 
 function parseDataBR(txt) {
