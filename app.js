@@ -601,7 +601,8 @@ function openCliente(cid) {
     return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div><span style="font-family:var(--mono);font-weight:500;color:var(--text)">${pl.placa}</span>
-        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:12px">Renavan: ${pl.renavan}</span></div>
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:12px">Renavan: ${pl.renavan}</span>
+        <span onclick="editarPlaca('${pl.id}','${cid}')" style="font-size:11px;color:var(--blue);cursor:pointer;margin-left:10px">✎ editar</span></div>
         <span class="badge b-blue">${paits.length} AITs</span>
       </div>
       <table style="width:100%;border-collapse:collapse">${rows}${more}</table></div>`
