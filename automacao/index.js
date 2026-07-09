@@ -74,7 +74,7 @@ async function main() {
   const alvo = await escolherAlvo(clientes, placas, porPlaca)
   console.log(`\nModo: ${alvo.rotulo}`)
 
-  const { arqRelatorio } = await Rodada.executar({
+  const { arqRelatorio, arqInvalidas } = await Rodada.executar({
     alvoIds: alvo.ids,
     dryRun: DRY,
     consultarStatus: !SO_COMERCIAL,
@@ -90,6 +90,7 @@ async function main() {
   })
   R.abrir(arqRelatorio)
   console.log(`\nRelatório: ${arqRelatorio}`)
+  if (arqInvalidas) console.log(`Placas com dado inválido pra corrigir: ${arqInvalidas}`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

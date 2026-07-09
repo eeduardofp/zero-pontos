@@ -150,6 +150,7 @@
       <h2>Resultado</h2>
       <p id="fim-msg" style="font-size:14px;margin-bottom:8px"></p>
       <p style="font-size:13px;color:var(--cinza)" id="fim-arquivo"></p>
+      <p style="font-size:13px;color:#f59e0b" id="fim-invalidas"></p>
       <div style="margin-top:14px">
         <button class="btn-claro" id="btn-nova">Nova consulta</button>
       </div>
@@ -312,6 +313,7 @@ function render(e) {
       $('fim-msg').innerHTML = (e.parou ? '⏹ Rodada interrompida. ' : '✅ Rodada concluída. ') + (resumo || '')
     }
     $('fim-arquivo').textContent = e.arqRelatorio ? 'Relatório salvo em: ' + e.arqRelatorio : ''
+    $('fim-invalidas').textContent = e.arqInvalidas ? '⚠ Placas com dado inválido pra corrigir: ' + e.arqInvalidas : ''
   }
 }
 </script>

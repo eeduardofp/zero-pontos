@@ -6,6 +6,7 @@ const S = require('./supabase.js')
 const D = require('./detran.js')
 const M = require('./mapeamento.js')
 const R = require('./relatorio.js')
+const PI = require('./placasInvalidas.js')
 const Bloq = require('./bloqueios.js')
 
 const PAUSA_ENTRE_PLACAS_MS = 3000
@@ -77,7 +78,9 @@ async function executar(opcoes) {
 
   const itens = []
   const arqRelatorio = R.novoCaminho()   // caminho fixo — regravado a cada placa
-  const flush = () => R.gerar(itens, dryRun, arqRelatorio)
+  const invalidas = []
+  const arqInvalidas = PI.novoCaminho()
+  const flush = () => { R.gerar(itens, dryRun, arqRelatorio); if (invalidas.length) PI.gerar(invalidas, arqInvalidas) }
 
   const nomeCliente = placa => {
     const c = clientes.find(x => x.id === placa.cliente_id)
@@ -125,6 +128,7 @@ async function executar(opcoes) {
                   : !renavamOk ? `renavam ausente/inválido ("${placa.renavan}")`
                   : `placa inválida ("${placa.placa}")`
       novos = marcarTodas(placa, 'dados-invalidos', falta)
+      invalidas.push({ cliente: nomeCliente(placa), placa: placa.placa, renavam: placa.renavan, motivo: falta })
       emit('placa', { n, total: fila.length, placa: placa.placa, novos }); flush(); continue
     }
 
@@ -195,8 +199,8 @@ async function executar(opcoes) {
   flush()
   const resumo = {}
   for (const i of itens) resumo[i.tipo] = (resumo[i.tipo] || 0) + 1
-  emit('fim', { resumo, arqRelatorio, parou })
-  return { resumo, arqRelatorio, itens }
+  emit('fim', { resumo, arqRelatorio, arqInvalidas: invalidas.length ? arqInvalidas : null, parou })
+  return { resumo, arqRelatorio, arqInvalidas: invalidas.length ? arqInvalidas : null, itens }
 }
 
 // Consulta um dossiê já aberto e devolve os itens de relatório das AITs da placa.

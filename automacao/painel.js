@@ -23,6 +23,7 @@ const estado = {
   espera: null,              // {tipo, msg}
   resumo: null,
   arqRelatorio: null,
+  arqInvalidas: null,
   parou: false,
   erro: null
 }
@@ -94,7 +95,7 @@ async function iniciar(corpo) {
   Object.assign(estado, {
     fase: 'rodando', dryRun: !!corpo.dryRun, rotulo: `${rotulo} · ${escopo}`,
     total: 0, feitas: 0, contadores: {}, ultimas: [], espera: null,
-    resumo: null, arqRelatorio: null, parou: false, erro: null
+    resumo: null, arqRelatorio: null, arqInvalidas: null, parou: false, erro: null
   })
   pedirParada = false
   broadcast()
@@ -117,6 +118,7 @@ async function iniciar(corpo) {
         estado.fase = 'fim'
         estado.resumo = dd.resumo
         estado.arqRelatorio = dd.arqRelatorio
+        estado.arqInvalidas = dd.arqInvalidas
         estado.parou = dd.parou
       }
       broadcast()
@@ -180,7 +182,7 @@ const server = http.createServer(async (req, res) => {
       Object.assign(estado, {
         fase: 'ocioso', dryRun: true, rotulo: '', total: 0, feitas: 0,
         contadores: {}, ultimas: [], espera: null, resumo: null,
-        arqRelatorio: null, parou: false, erro: null
+        arqRelatorio: null, arqInvalidas: null, parou: false, erro: null
       })
       broadcast()
       return json(res, 200, { ok: true })
