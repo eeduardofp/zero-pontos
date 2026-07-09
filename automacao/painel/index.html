@@ -139,7 +139,7 @@
       <p id="fim-msg" style="font-size:14px;margin-bottom:8px"></p>
       <p style="font-size:13px;color:var(--cinza)" id="fim-arquivo"></p>
       <div style="margin-top:14px">
-        <button class="btn-claro" onclick="location.reload()">Nova consulta</button>
+        <button class="btn-claro" id="btn-nova">Nova consulta</button>
       </div>
     </div>
 
@@ -241,6 +241,7 @@ $('btn-parar').onclick = () => {
   $('btn-parar').textContent = 'Parando após a placa atual...'
   fetch('/api/parar', { method: 'POST' })
 }
+$('btn-nova').onclick = () => fetch('/api/reiniciar', { method: 'POST' }).then(() => location.reload())
 
 function render(e) {
   const rodando = e.fase === 'rodando' || e.fase === 'aguardando'

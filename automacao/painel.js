@@ -163,6 +163,20 @@ const server = http.createServer(async (req, res) => {
       pedirParada = true
       return json(res, 200, { ok: true })
     }
+    if (req.method === 'POST' && url.pathname === '/api/reiniciar') {
+      // "Nova consulta": só permitido fora de uma rodada ativa — evita
+      // resetar o estado embaixo de uma execução em andamento
+      if (estado.fase === 'rodando' || estado.fase === 'aguardando') {
+        throw Object.assign(new Error('Rodada em andamento — pare antes de reiniciar'), { code: 409 })
+      }
+      Object.assign(estado, {
+        fase: 'ocioso', dryRun: true, rotulo: '', total: 0, feitas: 0,
+        contadores: {}, ultimas: [], espera: null, resumo: null,
+        arqRelatorio: null, parou: false, erro: null
+      })
+      broadcast()
+      return json(res, 200, { ok: true })
+    }
     json(res, 404, { erro: 'não encontrado' })
   } catch (e) {
     json(res, e.code || 500, { erro: e.message })
