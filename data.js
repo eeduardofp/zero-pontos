@@ -82,16 +82,31 @@ const Data = (() => {
 
   function precisaRecurso(a) {
     if (a.encerrado) return false
+    // Regra 1: etapa anterior indeferida e próxima etapa vazia
     const defInd  = a.defesa_previa === 'Indeferido'
     const jariVaz = !a.jari || a.jari === '' || a.jari === 'Não realizado'
     const jariInd = a.jari === 'Indeferido'
     const segVaz  = !a.segunda_instancia || a.segunda_instancia === '' || a.segunda_instancia === 'Não realizado'
-    return (defInd && jariVaz) || (jariInd && segVaz)
+    if ((defInd && jariVaz) || (jariInd && segVaz)) return true
+    // Regra 2: qualquer etapa "Não realizado" com vencimento preenchido
+    const temVencimento = !!a.vencimento
+    if (!temVencimento) return false
+    const defNR = a.defesa_previa === 'Não realizado'
+    const jariNR = a.jari === 'Não realizado'
+    const segNR = a.segunda_instancia === 'Não realizado'
+    return defNR || jariNR || segNR
   }
 
   function proximaEtapa(a) {
+    // Indeferido → próxima etapa
     if (a.defesa_previa === 'Indeferido' && (!a.jari || a.jari === '' || a.jari === 'Não realizado')) return 'JARI'
     if (a.jari === 'Indeferido' && (!a.segunda_instancia || a.segunda_instancia === '' || a.segunda_instancia === 'Não realizado')) return '2ª Instância'
+    // Não realizado com vencimento → fazer a própria etapa
+    if (a.vencimento) {
+      if (a.defesa_previa === 'Não realizado') return 'Defesa Prévia'
+      if (a.jari === 'Não realizado') return 'JARI'
+      if (a.segunda_instancia === 'Não realizado') return '2ª Instância'
+    }
     return null
   }
 
