@@ -6,6 +6,7 @@ const D = require('./detran.js')
 const M = require('./mapeamento.js')
 const R = require('./relatorio.js')
 const Bloq = require('./bloqueios.js')
+const Sel = require('./selecao.js')
 
 const DRY = process.argv.includes('--dry-run')
 const PAUSA_ENTRE_PLACAS_MS = 3000
@@ -16,10 +17,59 @@ const STATUS_LABEL = a =>
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-// Espera o usuário teclar ENTER no console (gate de login / troca de conta)
-function esperarEnter(msg) {
+// Pergunta no console e devolve o que foi digitado
+function perguntar(msg) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  return new Promise(res => rl.question(msg, () => { rl.close(); res() }))
+  return new Promise(res => rl.question(msg, resp => { rl.close(); res(resp) }))
+}
+
+// Espera o usuário teclar ENTER no console (gate de login / troca de conta)
+const esperarEnter = msg => perguntar(msg)
+
+// Menu inicial: todas as AITs, um cliente ou uma placa.
+// → { ids: Set<placaId> | null (todas), rotulo }
+async function escolherAlvo(clientes, placas, porPlaca) {
+  console.log('\nO que consultar?')
+  console.log(' [1] Todas as AITs ativas  (Enter = padrão)')
+  console.log(' [2] Cliente específico')
+  console.log(' [3] Placa específica')
+  const op = (await perguntar('Opção: ')).trim()
+
+  if (op === '2') {
+    while (true) {
+      const termo = await perguntar('\nNome (ou parte) do cliente: ')
+      const achados = Sel.buscarClientes(clientes, termo).slice(0, 15)
+      if (!achados.length) { console.log('Nenhum cliente encontrado. Tente de novo.'); continue }
+      achados.forEach((c, i) => console.log(` [${i + 1}] ${c.nome}`))
+      const n = parseInt(await perguntar('Número do cliente: '), 10)
+      const cli = achados[n - 1]
+      if (!cli) { console.log('Opção inválida.'); continue }
+      const ids = new Set(Sel.placasDoCliente(placas, cli.id).map(p => p.id))
+      const ativas = [...ids].filter(id => porPlaca.has(id))
+      if (!ativas.length) { console.log(`${cli.nome} não tem AITs ativas. Tente outro.`); continue }
+      console.log(`→ ${cli.nome}: ${ativas.length} placa(s) com AITs ativas`)
+      return { ids, rotulo: `cliente ${cli.nome}` }
+    }
+  }
+
+  if (op === '3') {
+    while (true) {
+      const termo = await perguntar('\nPlaca (ou parte): ')
+      const achadas = Sel.buscarPlacas(placas, termo).filter(p => porPlaca.has(p.id)).slice(0, 15)
+      if (!achadas.length) { console.log('Nenhuma placa com AITs ativas encontrada. Tente de novo.'); continue }
+      let alvo = achadas[0]
+      if (achadas.length > 1) {
+        achadas.forEach((p, i) => console.log(` [${i + 1}] ${p.placa}`))
+        const n = parseInt(await perguntar('Número da placa: '), 10)
+        alvo = achadas[n - 1]
+        if (!alvo) { console.log('Opção inválida.'); continue }
+      }
+      console.log(`→ placa ${alvo.placa}`)
+      return { ids: new Set([alvo.id]), rotulo: `placa ${alvo.placa}` }
+    }
+  }
+
+  return { ids: null, rotulo: 'todas as AITs ativas' }
 }
 
 // Consulta o dossiê e devolve os itens de relatório para as AITs desta placa.
@@ -87,6 +137,9 @@ async function main() {
     porPlaca.get(a.placa_id).push(a)
   }
 
+  // Escopo da rodada: tudo, um cliente ou uma placa
+  const alvo = await escolherAlvo(clientes, placas, porPlaca)
+
   // Login obrigatório e limpo a cada execução: apaga a sessão anterior antes
   // de abrir o browser, para você poder entrar com a conta que quiser.
   D.limparSessao()
@@ -106,7 +159,8 @@ async function main() {
     for (const a of porPlaca.get(placa.id)) itens.push({ cliente: nomeCliente(placa), placa: placa.placa, codigo: a.codigo, tipo, detalhe })
   }
 
-  const fila = [...porPlaca.keys()]
+  const fila = [...porPlaca.keys()].filter(id => !alvo.ids || alvo.ids.has(id))
+  console.log(`\nModo: ${alvo.rotulo} — ${fila.length} placa(s) na fila`)
   let n = 0
   let trocasLimite = 0
 
