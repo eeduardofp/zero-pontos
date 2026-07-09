@@ -7,10 +7,23 @@ const Comercial = (() => {
   // ── SUPABASE ──────────────────────────────────────────────
   function db() { return Auth.getClient() }
 
+  // Supabase corta em 1000 linhas por padrão (PostgREST max-rows), sem erro —
+  // silenciosamente. Paginar sempre que a lista puder crescer.
+  async function buscarTudo(query) {
+    let tudo = [], de = 0
+    const passo = 1000
+    while (true) {
+      const { data, error } = await query.range(de, de + passo - 1)
+      if (error) throw error
+      tudo = tudo.concat(data)
+      if (data.length < passo) break
+      de += passo
+    }
+    return tudo
+  }
+
   async function loadOps() {
-    const { data, error } = await db().from('oportunidades').select('*').order('created_at', { ascending: false })
-    if (error) throw error
-    ops = data
+    ops = await buscarTudo(db().from('oportunidades').select('*').order('created_at', { ascending: false }))
   }
 
   async function createOp(obj) {

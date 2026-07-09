@@ -5,14 +5,24 @@ const API = (() => {
     return Auth.getClient()
   }
 
+  // Supabase corta em 1000 linhas por padrão (PostgREST max-rows), sem erro
+  // nenhum — silenciosamente. Qualquer select() de lista precisa paginar.
+  async function buscarTudo(query) {
+    let tudo = [], de = 0
+    const passo = 1000
+    while (true) {
+      const { data, error } = await query.range(de, de + passo - 1)
+      if (error) throw error
+      tudo = tudo.concat(data)
+      if (data.length < passo) break
+      de += passo
+    }
+    return tudo
+  }
+
   // ── CLIENTES ──────────────────────────────────────────────
   async function getClientes() {
-    const { data, error } = await db()
-      .from('clientes')
-      .select('*')
-      .order('nome')
-    if (error) throw error
-    return data
+    return buscarTudo(db().from('clientes').select('*').order('nome'))
   }
 
   async function createCliente(c) {
@@ -38,11 +48,7 @@ const API = (() => {
 
   // ── PLACAS ────────────────────────────────────────────────
   async function getPlacas() {
-    const { data, error } = await db()
-      .from('placas')
-      .select('*')
-    if (error) throw error
-    return data
+    return buscarTudo(db().from('placas').select('*'))
   }
 
   async function createPlaca(p) {
@@ -57,12 +63,7 @@ const API = (() => {
 
   // ── AITs ──────────────────────────────────────────────────
   async function getAITs() {
-    const { data, error } = await db()
-      .from('aits')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data
+    return buscarTudo(db().from('aits').select('*').order('created_at', { ascending: false }))
   }
 
   async function createAIT(a) {

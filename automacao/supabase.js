@@ -4,6 +4,22 @@ const { createClient } = require('@supabase/supabase-js')
 
 let client = null
 
+// Supabase corta em 1000 linhas por padrão (PostgREST max-rows), sem erro —
+// silenciosamente. Bug real encontrado em 2026-07-09: uma tabela com 1032
+// linhas ficou com 32 de fora numa consulta inteira sem nenhum aviso.
+async function buscarTudo(query) {
+  let tudo = [], de = 0
+  const passo = 1000
+  while (true) {
+    const { data, error } = await query.range(de, de + passo - 1)
+    if (error) throw error
+    tudo = tudo.concat(data)
+    if (data.length < passo) break
+    de += passo
+  }
+  return tudo
+}
+
 async function login() {
   for (const v of ['SUPABASE_URL', 'SUPABASE_KEY', 'SUPABASE_EMAIL', 'SUPABASE_SENHA']) {
     if (!process.env[v]) throw new Error(`Variável ${v} ausente no .env`)
@@ -19,12 +35,11 @@ async function login() {
 // AITs ativas (encerrado false OU null — app filtra !a.encerrado) + placas + clientes
 async function carregarAtivas() {
   const [aits, placas, clientes] = await Promise.all([
-    client.from('aits').select('*').or('encerrado.is.null,encerrado.eq.false'),
-    client.from('placas').select('*'),
-    client.from('clientes').select('*')
+    buscarTudo(client.from('aits').select('*').or('encerrado.is.null,encerrado.eq.false')),
+    buscarTudo(client.from('placas').select('*')),
+    buscarTudo(client.from('clientes').select('*'))
   ])
-  for (const r of [aits, placas, clientes]) if (r.error) throw r.error
-  return { aits: aits.data, placas: placas.data, clientes: clientes.data }
+  return { aits, placas, clientes }
 }
 
 async function updateAIT(id, fields) {
@@ -36,13 +51,12 @@ async function updateAIT(id, fields) {
 // serviço já vendido não é oportunidade) + oportunidades já registradas.
 async function carregarComercial() {
   const [aits, ops] = await Promise.all([
-    client.from('aits').select('codigo'),
-    client.from('oportunidades').select('id, codigo_ait, placa_id, status')
+    buscarTudo(client.from('aits').select('codigo')),
+    buscarTudo(client.from('oportunidades').select('id, codigo_ait, placa_id, status'))
   ])
-  for (const r of [aits, ops]) if (r.error) throw r.error
   return {
-    codigosAits: aits.data.map(a => a.codigo).filter(Boolean),
-    oportunidades: ops.data
+    codigosAits: aits.map(a => a.codigo).filter(Boolean),
+    oportunidades: ops
   }
 }
 
