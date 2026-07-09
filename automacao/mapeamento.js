@@ -116,6 +116,19 @@ function montarUpdate(ait, achados) {
     merged = { ...merged, defesa_previa: 'Indeferido' }
   }
 
+  // Abertura da próxima etapa: indeferido deixa a etapa seguinte como
+  // "Não realizado" (nunca vazia) — com vencimento definido, o workspace
+  // joga a AIT automaticamente na fila de recursos. Só preenche etapa
+  // vazia: "Aguardando" significa recurso já protocolado, não sobrescreve.
+  if (merged.defesa_previa === 'Indeferido' && !merged.jari) {
+    fields.jari = 'Não realizado'
+    merged = { ...merged, jari: 'Não realizado' }
+  }
+  if (merged.jari === 'Indeferido' && !merged.segunda_instancia) {
+    fields.segunda_instancia = 'Não realizado'
+    merged = { ...merged, segunda_instancia: 'Não realizado' }
+  }
+
   if (!ait.encerrado && deveEncerrar(merged)) fields.encerrado = true
   fields.ultima_att = hoje()
   return fields

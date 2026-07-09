@@ -168,6 +168,37 @@ test('montarUpdate: site não regride DP julgada para Aguardando', () => {
   assert.notStrictEqual(up.defesa_previa, 'Aguardando')
 })
 
+test('montarUpdate: DP indeferida abre JARI como "Não realizado" (alimenta fila de recursos)', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: '', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'defesa_previa', resultado: 'INDEFERIDO em 19/02/2025', dataLimite: '2025-09-12' }])
+  assert.strictEqual(up.defesa_previa, 'Indeferido')
+  assert.strictEqual(up.jari, 'Não realizado')
+  assert.strictEqual(up.vencimento, '2025-09-12')
+})
+
+test('montarUpdate: não sobrescreve JARI já protocolada com "Não realizado"', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: 'Aguardando', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'defesa_previa', resultado: 'INDEFERIDO em 19/02/2025', dataLimite: null }])
+  assert.strictEqual(up.defesa_previa, 'Indeferido')
+  assert.strictEqual(up.jari, undefined)
+})
+
+test('montarUpdate: JARI indeferida abre 2ª instância como "Não realizado"', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Aguardando', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: '2026-06-03' }])
+  assert.strictEqual(up.jari, 'Indeferido')
+  assert.strictEqual(up.segunda_instancia, 'Não realizado')
+  assert.strictEqual(up.encerrado, undefined)
+})
+
+test('montarUpdate: cascata + abertura juntas (site só mostra JARI indeferida)', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: '', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: null }])
+  assert.strictEqual(up.defesa_previa, 'Indeferido')   // cascata
+  assert.strictEqual(up.jari, 'Indeferido')
+  assert.strictEqual(up.segunda_instancia, 'Não realizado') // abertura
+})
+
 test('montarUpdate: nada encontrado no site → só ultima_att', () => {
   const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: '', segunda_instancia: '', encerrado: false }
   const up = M.montarUpdate(ait, [])
