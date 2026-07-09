@@ -30,6 +30,7 @@ function gerar(itens, dryRun, arqFixo) {
   const linhas = itens.map(i => `<tr>
     <td>${i.cliente || '—'}</td><td>${i.placa || '—'}</td><td>${i.codigo || '—'}</td>
     <td style="color:${COR[i.tipo] || '#64748b'};font-weight:600">${i.tipo}</td>
+    <td style="${i.alteracao ? 'color:#16a34a;font-weight:600' : ''}">${i.alteracao || '—'}</td>
     <td>${i.antes || '—'}</td><td>${i.depois || '—'}</td>
     <td>${i.vencimento || '—'}</td><td>${i.detalhe || ''}</td></tr>`).join('')
 
@@ -42,7 +43,7 @@ th{background:#1e293b}.aviso{background:#7c2d12;padding:10px;border-radius:8px;m
 <h1>Consulta de Recursos — ${new Date().toLocaleString('pt-BR')}</h1>
 ${dryRun ? '<div class="aviso"><b>DRY-RUN:</b> nada foi gravado no workspace.</div>' : ''}
 <p>${Object.entries(resumo).map(([k, v]) => `<b>${v}</b> ${k}`).join(' · ')}</p>
-<table><tr><th>Cliente</th><th>Placa</th><th>AIT</th><th>Resultado</th><th>Antes</th><th>Depois</th><th>Vencimento</th><th>Detalhe</th></tr>
+<table><tr><th>Cliente</th><th>Placa</th><th>AIT</th><th>Resultado</th><th>Alteração</th><th>Antes</th><th>Depois</th><th>Vencimento</th><th>Detalhe</th></tr>
 ${linhas}</table></body></html>`
 
   const arq = arqFixo || novoCaminho()

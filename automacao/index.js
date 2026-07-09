@@ -50,13 +50,22 @@ async function processarDossie(page, placa, aits, clientes) {
       }))
     const up = M.montarUpdate(ait, achados)
     const antes = STATUS_LABEL(ait)
-    const soUltimaAtt = Object.keys(up).length === 1
+
+    // diff real: só é "atualizado" se algum valor de fato mudou —
+    // regravar o mesmo status não conta (antes 130 falsos "atualizado")
+    const ROTULO = { defesa_previa: 'DP', jari: 'JARI', segunda_instancia: '2ª', encerrado: 'Encerrada', vencimento: 'Vencimento' }
+    const mudancas = Object.keys(ROTULO)
+      .filter(k => k in up && String(up[k] == null ? '' : up[k]) !== String(ait[k] == null ? '' : ait[k]))
+    const alteracao = mudancas
+      .map(k => `${ROTULO[k]}: ${ait[k] || '—'} → ${up[k]}`)
+      .join('; ')
 
     if (!DRY) await S.updateAIT(ait.id, up)
 
     itens.push({
       cliente: nomeCliente, placa: placa.placa, codigo: ait.codigo,
-      tipo: achados.length === 0 ? 'nao-encontrado' : (soUltimaAtt ? 'sem-mudanca' : 'atualizado'),
+      tipo: achados.length === 0 ? 'nao-encontrado' : (mudancas.length ? 'atualizado' : 'sem-mudanca'),
+      alteracao,
       antes, depois: STATUS_LABEL({ ...ait, ...up }),
       vencimento: up.vencimento || '',
       detalhe: up.encerrado ? 'AIT encerrada' : ''
@@ -147,7 +156,7 @@ async function main() {
         // erro técnico (navegação/timeout): 1 retry, depois marca erro
         tentativaTecnica++
         if (tentativaTecnica > 1) {
-          const shot = await D.screenshotErro(page, placa.placa)
+          const shot = await D.screenshotErro(page, placaLimpa)
           marcarTodas(placa, 'erro', `${e.message} (screenshot: ${shot})`)
           break
         }
@@ -187,8 +196,12 @@ async function main() {
         // não marca resolvido → volta ao while e reconsulta a mesma placa
       } else {
         // desfecho desconhecido — guarda texto p/ refino e segue
-        const shot = await D.screenshotErro(page, placa.placa)
-        marcarTodas(placa, 'erro', `desfecho não reconhecido: "${desfecho.texto}" (screenshot: ${shot})`)
+        const shot = await D.screenshotErro(page, placaLimpa)
+        const semResposta = !/erro/i.test(desfecho.texto)
+        const detalhe = semResposta
+          ? `site não retornou o dossiê (veículo fora de SC?) (screenshot: ${shot})`
+          : `desfecho não reconhecido: "${desfecho.texto.slice(0, 200)}" (screenshot: ${shot})`
+        marcarTodas(placa, 'erro', detalhe)
         resolvido = true
       }
     }

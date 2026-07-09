@@ -254,7 +254,9 @@ function todosDebitos(page) {
 
 async function screenshotErro(page, placa) {
   fs.mkdirSync(LOGS, { recursive: true })
-  const arq = path.join(LOGS, `erro-${placa}-${Date.now()}.png`)
+  // sanitiza: placa do cadastro pode conter "/" ("EZS7E24/SP") e viraria pasta
+  const nome = String(placa).replace(/[^0-9A-Za-z]/g, '')
+  const arq = path.join(LOGS, `erro-${nome}-${Date.now()}.png`)
   try { await page.screenshot({ path: arq, fullPage: true }) } catch {}
   return arq
 }

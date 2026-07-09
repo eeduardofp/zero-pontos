@@ -27,9 +27,26 @@ function normalizar(s) {
   return (s || '').toUpperCase().replace(/\s+/g, '')
 }
 
+// Núcleo do identificador: nos códigos estruturados
+// (PREFIXO-NNNNNN-NÚCLEO-EEEE-D) é o 3º segmento contando do fim.
+// A seção Débitos trunca o dígito final e abrevia o prefixo
+// ("JOINVIL-...-7455" vs "JOINVILLE-...-7455-0"), então o casamento
+// confiável é pelo núcleo. Sem estrutura → código inteiro normalizado.
+function nucleoCodigo(codigo) {
+  const partes = String(codigo == null ? '' : codigo).split('-')
+  if (partes.length >= 4) {
+    const nucleo = normalizar(partes[partes.length - 3])
+    if (nucleo.length >= 6) return nucleo
+  }
+  return normalizar(codigo)
+}
+
 function contemCodigo(texto, codigo) {
   if (!codigo) return false
-  return normalizar(texto).includes(normalizar(codigo))
+  const t = normalizar(texto)
+  if (t.includes(normalizar(codigo))) return true
+  const nucleo = nucleoCodigo(codigo)
+  return nucleo.length >= 6 && t.includes(nucleo)
 }
 
 // Cadastro guarda a placa com sufixo de UF ("QJC8G88/SC") e às vezes com
@@ -83,10 +100,25 @@ function montarUpdate(ait, achados) {
     fields[a.instancia] = m.status
     if (m.precisaDataLimite && a.dataLimite) fields.vencimento = a.dataLimite
   }
-  const merged = { ...ait, ...fields }
+
+  // Cascata de consistência: instância posterior existente implica anterior
+  // indeferida (JARI só existe se DP foi indeferida; 2ª só se JARI foi).
+  // Impede estado impossível (DP aguardando + JARI aguardando) e regressão
+  // de etapa já julgada. "Não realizado" é estado válido — não mexe.
+  let merged = { ...ait, ...fields }
+  const existe = v => v && v !== 'Não realizado'
+  if (existe(merged.segunda_instancia) && (!merged.jari || merged.jari === 'Aguardando')) {
+    fields.jari = 'Indeferido'
+    merged = { ...merged, jari: 'Indeferido' }
+  }
+  if (existe(merged.jari) && (!merged.defesa_previa || merged.defesa_previa === 'Aguardando')) {
+    fields.defesa_previa = 'Indeferido'
+    merged = { ...merged, defesa_previa: 'Indeferido' }
+  }
+
   if (!ait.encerrado && deveEncerrar(merged)) fields.encerrado = true
   fields.ultima_att = hoje()
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido }

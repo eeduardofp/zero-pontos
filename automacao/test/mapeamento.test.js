@@ -33,6 +33,24 @@ test('mapResultado retorna null para texto desconhecido', () => {
   assert.strictEqual(M.mapResultado(null), null)
 })
 
+test('nucleoCodigo extrai o miolo do identificador', () => {
+  assert.strictEqual(M.nucleoCodigo('UF:RD-000100-R855283197-7455-0'), 'R855283197')
+  assert.strictEqual(M.nucleoCodigo('JOINVILLE-008805-JL01206597-7455-0'), 'JL01206597')
+  assert.strictEqual(M.nucleoCodigo('UF:SP-126200- 1V 0420707-7455-0'), '1V0420707')
+  assert.strictEqual(M.nucleoCodigo('114100-VSV0597959-7455-0'), 'VSV0597959')
+  // sem estrutura de segmentos → usa o código inteiro normalizado
+  assert.strictEqual(M.nucleoCodigo('N004330074'), 'N004330074')
+})
+
+test('contemCodigo casa débito TRUNCADO pelo núcleo (bug do vencimento)', () => {
+  // débito corta o dígito final e abrevia o prefixo — substring integral falha
+  assert.ok(M.contemCodigo('UF:RD-000100-R855283197-7455Vencimento 11/07/2025', 'UF:RD-000100-R855283197-7455-0'))
+  assert.ok(M.contemCodigo('JOINVIL-008805-JL01206597-7455Vencimento 24/03/2025', 'JOINVILLE-008805-JL01206597-7455-0'))
+  assert.ok(M.contemCodigo('UF:SP-126200-1V 5379787-7455Vencimento 20/10/2025', 'UF:SP-126200- 1V 5379787 -7455-0'))
+  // núcleo diferente → não casa
+  assert.ok(!M.contemCodigo('UF:RD-000100-R855283197-7455', 'UF:RD-000100-J001658782-7455-0'))
+})
+
 test('contemCodigo ignora espaços e caixa (site insere espaço no código)', () => {
   assert.ok(M.contemCodigo('Identificador do AutoUF:SP-126200-1V 5379787-7455-0', '1V5379787'))
   assert.ok(M.contemCodigo('UF:RD-000100-R855283197-7455Vencimento 11/07/2025', 'R855283197'))
@@ -116,6 +134,38 @@ test('montarUpdate: site prevalece sobre workspace desatualizado', () => {
   ])
   assert.strictEqual(up.defesa_previa, 'Indeferido')
   assert.strictEqual(up.jari, 'Aguardando')
+})
+
+test('montarUpdate: JARI existente força DP indeferida (estado impossível)', () => {
+  // site mostra só card da JARI cadastrada; DP aguardando no workspace é impossível
+  const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: '', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'Cadastrado sem decisão', dataLimite: null }])
+  assert.strictEqual(up.jari, 'Aguardando')
+  assert.strictEqual(up.defesa_previa, 'Indeferido')
+})
+
+test('montarUpdate: cascata não mexe em DP "Não realizado"', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Não realizado', jari: '', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'Cadastrado sem decisão', dataLimite: null }])
+  assert.strictEqual(up.defesa_previa, undefined)
+})
+
+test('montarUpdate: 2ª instância existente força JARI indeferida', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Aguardando', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'segunda_instancia', resultado: 'Cadastrado sem decisão', dataLimite: null }])
+  assert.strictEqual(up.segunda_instancia, 'Aguardando')
+  assert.strictEqual(up.jari, 'Indeferido')
+})
+
+test('montarUpdate: site não regride DP julgada para Aguardando', () => {
+  // caso real: DP:Indeferido no workspace; site tem card de defesa "sem decisão"
+  // + JARI aguardando — a cascata deve manter DP:Indeferido
+  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Aguardando', segunda_instancia: '', encerrado: false }
+  const up = M.montarUpdate(ait, [
+    { instancia: 'defesa_previa', resultado: 'Cadastrado sem decisão', dataLimite: null },
+    { instancia: 'jari', resultado: 'Cadastrado sem decisão', dataLimite: null }
+  ])
+  assert.notStrictEqual(up.defesa_previa, 'Aguardando')
 })
 
 test('montarUpdate: nada encontrado no site → só ultima_att', () => {
