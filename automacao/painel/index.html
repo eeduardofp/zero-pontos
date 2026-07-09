@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta de Recursos — Zero Pontos</title>
+<style>
+  :root {
+    --verde: #15803d; --verde-escuro: #14532d; --vermelho: #b91c1c;
+    --ambar: #b45309; --cinza: #64748b; --roxo: #7e22ce; --laranja: #c2410c;
+    --fundo: #f4f5f2; --card: #ffffff; --borda: #e2e5e0; --texto: #1f2937;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--fundo); color: var(--texto); min-height: 100vh; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+  header img { width: 72px; height: 72px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  header h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  header p { color: var(--cinza); font-size: 14px; margin-top: 2px; }
+
+  .card { background: var(--card); border: 1px solid var(--borda); border-radius: 16px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 18px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--cinza); margin-bottom: 14px; }
+
+  .modos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .modo { border: 2px solid var(--borda); border-radius: 12px; padding: 14px; cursor: pointer; text-align: center; transition: all .15s; background: #fff; font-size: 14px; }
+  .modo b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .modo.ativo { border-color: var(--verde); background: #f0fdf4; }
+  .modo span { color: var(--cinza); font-size: 12px; }
+
+  .busca { position: relative; margin-top: 14px; display: none; }
+  .busca.visivel { display: block; }
+  .busca input { width: 100%; padding: 12px 14px; border: 2px solid var(--borda); border-radius: 10px; font-size: 15px; outline: none; }
+  .busca input:focus { border-color: var(--verde); }
+  .sugestoes { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--borda); border-radius: 10px; margin-top: 4px; max-height: 260px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 10; display: none; }
+  .sugestoes.aberta { display: block; }
+  .sugestoes div { padding: 10px 14px; cursor: pointer; font-size: 14px; }
+  .sugestoes div:hover { background: #f0fdf4; }
+  .sugestoes small { color: var(--cinza); }
+  .escolhido { margin-top: 10px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; font-size: 14px; display: none; }
+  .escolhido.visivel { display: block; }
+
+  .linha-opcoes { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; gap: 14px; }
+  .chave { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; user-select: none; }
+  .chave input { display: none; }
+  .trilho { width: 44px; height: 24px; background: #cbd5e1; border-radius: 12px; position: relative; transition: background .15s; }
+  .trilho::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .15s; }
+  .chave input:checked + .trilho { background: var(--verde); }
+  .chave input:checked + .trilho::after { left: 23px; }
+
+  button { font-family: inherit; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
+  .btn-primario { background: var(--verde); color: #fff; padding: 13px 34px; font-size: 16px; }
+  .btn-primario:hover { background: var(--verde-escuro); }
+  .btn-primario:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .btn-claro { background: #fff; border: 2px solid var(--borda); padding: 10px 22px; font-size: 14px; }
+  .btn-vermelho { background: #fef2f2; border: 2px solid #fecaca; color: var(--vermelho); padding: 10px 22px; font-size: 14px; }
+
+  .banner { border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .banner.aviso { background: #fefce8; border: 2px solid #fde047; }
+  .banner.dry { background: #eff6ff; border: 1px solid #bfdbfe; font-size: 14px; padding: 10px 16px; }
+  .banner b { font-size: 15px; }
+  .banner p { font-size: 13px; color: #78716c; margin-top: 3px; }
+
+  .progresso { height: 10px; background: #e7e9e4; border-radius: 5px; overflow: hidden; margin: 10px 0 6px; }
+  .progresso div { height: 100%; background: var(--verde); border-radius: 5px; transition: width .3s; }
+  .prog-txt { font-size: 13px; color: var(--cinza); }
+
+  .contadores { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .cont { border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; background: #f1f5f9; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  td, th { border-bottom: 1px solid var(--borda); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { color: var(--cinza); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .tipo { font-weight: 600; }
+  .alteracao { color: var(--verde); font-weight: 600; }
+
+  .rodape { text-align: center; color: var(--cinza); font-size: 12px; margin-top: 30px; }
+  .oculto { display: none !important; }
+  a { color: var(--verde); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="/logo.svg" alt="Zero Pontos">
+    <div>
+      <h1>Consulta de Recursos</h1>
+      <p>Zero Pontos · Detran Digital SC</p>
+    </div>
+  </header>
+
+  <!-- ESTADO: configuração -->
+  <div id="tela-config">
+    <div class="card">
+      <h2>O que consultar</h2>
+      <div class="modos">
+        <div class="modo ativo" data-modo="todas"><b>Todas</b><span>todas as AITs ativas</span></div>
+        <div class="modo" data-modo="cliente"><b>Cliente</b><span>todas as placas dele</span></div>
+        <div class="modo" data-modo="placa"><b>Placa</b><span>uma placa específica</span></div>
+      </div>
+      <div class="busca" id="busca">
+        <input id="campo-busca" type="text" autocomplete="off" placeholder="">
+        <div class="sugestoes" id="sugestoes"></div>
+      </div>
+      <div class="escolhido" id="escolhido"></div>
+      <div class="linha-opcoes">
+        <label class="chave">
+          <input type="checkbox" id="dry" checked>
+          <span class="trilho"></span>
+          Modo teste (não grava no workspace)
+        </label>
+        <button class="btn-primario" id="btn-iniciar">Iniciar consulta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESTADO: execução / fim -->
+  <div id="tela-exec" class="oculto">
+    <div class="banner dry oculto" id="banner-dry">🧪 <b>Modo teste:</b>&nbsp;nada está sendo gravado no workspace.</div>
+
+    <div class="banner aviso oculto" id="banner-espera">
+      <div><b id="espera-titulo">Ação necessária</b><p id="espera-msg"></p></div>
+      <button class="btn-primario" id="btn-continuar">Já fiz login — Continuar</button>
+    </div>
+
+    <div class="card">
+      <h2 id="titulo-exec">Executando</h2>
+      <div class="prog-txt" id="rotulo"></div>
+      <div class="progresso"><div id="barra" style="width:0%"></div></div>
+      <div class="prog-txt" id="prog-txt">preparando...</div>
+      <div class="contadores" id="contadores"></div>
+      <div class="linha-opcoes oculto" id="linha-parar" style="justify-content:flex-end">
+        <button class="btn-vermelho" id="btn-parar">Parar após a placa atual</button>
+      </div>
+    </div>
+
+    <div class="card oculto" id="card-fim">
+      <h2>Resultado</h2>
+      <p id="fim-msg" style="font-size:14px;margin-bottom:8px"></p>
+      <p style="font-size:13px;color:var(--cinza)" id="fim-arquivo"></p>
+      <div style="margin-top:14px">
+        <button class="btn-claro" onclick="location.reload()">Nova consulta</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Últimas placas</h2>
+      <table>
+        <thead><tr><th>Placa</th><th>AIT</th><th>Resultado</th><th>Alteração</th><th>Detalhe</th></tr></thead>
+        <tbody id="feed"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rodape">Painel local · dados direto do workspace · relatórios em automacao\logs</div>
+</div>
+
+<script>
+const CORES = {
+  'atualizado': '#16a34a', 'sem-mudanca': '#64748b', 'nao-encontrado': '#d97706',
+  'sem-permissao': '#dc2626', 'pulado-protegido': '#7e22ce', 'dados-invalidos': '#b45309',
+  'limite': '#c2410c', 'erro': '#dc2626'
+}
+let dados = null            // { clientes, placas }
+let modo = 'todas'
+let selecionado = null      // { id, rotulo }
+
+const $ = id => document.getElementById(id)
+const chave = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const limparPlaca = s => (s || '').split('/')[0].replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+
+// ── configuração ─────────────────────────────────────────────
+fetch('/api/dados').then(r => r.json()).then(d => { dados = d })
+
+document.querySelectorAll('.modo').forEach(el => el.onclick = () => {
+  document.querySelectorAll('.modo').forEach(m => m.classList.remove('ativo'))
+  el.classList.add('ativo')
+  modo = el.dataset.modo
+  selecionado = null
+  $('escolhido').classList.remove('visivel')
+  $('campo-busca').value = ''
+  $('sugestoes').classList.remove('aberta')
+  const precisaBusca = modo !== 'todas'
+  $('busca').classList.toggle('visivel', precisaBusca)
+  $('campo-busca').placeholder = modo === 'cliente' ? 'Digite o nome do cliente...' : 'Digite a placa...'
+  if (precisaBusca) $('campo-busca').focus()
+})
+
+$('campo-busca').oninput = () => {
+  const termo = $('campo-busca').value
+  const alvo = $('sugestoes')
+  alvo.innerHTML = ''
+  selecionado = null
+  $('escolhido').classList.remove('visivel')
+  if (!dados || !termo.trim()) { alvo.classList.remove('aberta'); return }
+
+  let achados = []
+  if (modo === 'cliente') {
+    achados = dados.clientes.filter(c => chave(c.nome).includes(chave(termo))).slice(0, 12)
+      .map(c => ({ id: c.id, titulo: c.nome, sub: c.placas + ' placa(s) com AITs ativas' }))
+  } else {
+    const t = limparPlaca(termo)
+    achados = dados.placas.filter(p => t && limparPlaca(p.placa).includes(t)).slice(0, 12)
+      .map(p => ({ id: p.id, titulo: p.placa, sub: p.cliente }))
+  }
+  for (const a of achados) {
+    const div = document.createElement('div')
+    div.innerHTML = `${a.titulo} <small>· ${a.sub}</small>`
+    div.onclick = () => {
+      selecionado = { id: a.id, rotulo: a.titulo }
+      $('campo-busca').value = a.titulo
+      alvo.classList.remove('aberta')
+      $('escolhido').textContent = '✓ Selecionado: ' + a.titulo + ' — ' + a.sub
+      $('escolhido').classList.add('visivel')
+    }
+    alvo.appendChild(div)
+  }
+  alvo.classList.toggle('aberta', achados.length > 0)
+}
+
+$('btn-iniciar').onclick = async () => {
+  if (modo !== 'todas' && !selecionado) { alert('Escolha um ' + (modo === 'cliente' ? 'cliente' : 'placa') + ' na lista.'); return }
+  $('btn-iniciar').disabled = true
+  const resp = await fetch('/api/iniciar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modo, id: selecionado ? selecionado.id : null, dryRun: $('dry').checked })
+  })
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}))
+    alert('Não foi possível iniciar: ' + (e.erro || resp.status))
+    $('btn-iniciar').disabled = false
+  }
+}
+
+// ── execução (SSE) ───────────────────────────────────────────
+const sse = new EventSource('/api/eventos')
+sse.addEventListener('estado', ev => render(JSON.parse(ev.data)))
+
+$('btn-continuar').onclick = () => fetch('/api/continuar', { method: 'POST' })
+$('btn-parar').onclick = () => {
+  $('btn-parar').textContent = 'Parando após a placa atual...'
+  fetch('/api/parar', { method: 'POST' })
+}
+
+function render(e) {
+  const rodando = e.fase === 'rodando' || e.fase === 'aguardando'
+  const fim = e.fase === 'fim'
+  if (!rodando && !fim) return   // ocioso → fica na tela de configuração
+
+  $('tela-config').classList.add('oculto')
+  $('tela-exec').classList.remove('oculto')
+  $('banner-dry').classList.toggle('oculto', !e.dryRun)
+  $('rotulo').textContent = 'Escopo: ' + (e.rotulo || '—')
+
+  // espera (login / troca de conta)
+  const esperando = e.fase === 'aguardando' && e.espera
+  $('banner-espera').classList.toggle('oculto', !esperando)
+  if (esperando) {
+    $('espera-titulo').textContent = e.espera.tipo === 'limite' ? 'Limite de consultas — troque de conta' : 'Login no Detran Digital'
+    $('espera-msg').textContent = e.espera.msg
+  }
+
+  // progresso
+  const pct = e.total ? Math.round(100 * e.feitas / e.total) : 0
+  $('barra').style.width = pct + '%'
+  $('prog-txt').textContent = e.total ? `${e.feitas} de ${e.total} placa(s) · ${pct}%` : 'preparando...'
+  $('linha-parar').classList.toggle('oculto', !rodando || e.total === 0)
+  $('titulo-exec').textContent = fim ? 'Concluído' : (esperando ? 'Aguardando você' : 'Executando')
+
+  // contadores
+  $('contadores').innerHTML = Object.entries(e.contadores || {})
+    .map(([k, v]) => `<span class="cont" style="color:${CORES[k] || '#334155'}">${v} ${k}</span>`).join('')
+
+  // feed
+  $('feed').innerHTML = (e.ultimas || []).map(u =>
+    (u.novos && u.novos.length ? u.novos : [{}]).map(item => `<tr>
+      <td>${u.placa || '—'}</td>
+      <td style="font-family:monospace;font-size:12px">${item.codigo || '—'}</td>
+      <td class="tipo" style="color:${CORES[item.tipo] || '#334155'}">${item.tipo || '—'}</td>
+      <td class="alteracao">${item.alteracao || '—'}</td>
+      <td style="color:var(--cinza)">${item.detalhe || ''}</td></tr>`).join('')
+  ).join('')
+
+  // fim
+  $('card-fim').classList.toggle('oculto', !fim)
+  if (fim) {
+    $('btn-parar').classList.add('oculto')
+    if (e.erro) {
+      $('fim-msg').innerHTML = '❌ A rodada falhou: <b>' + e.erro + '</b>'
+    } else {
+      const resumo = Object.entries(e.resumo || {}).map(([k, v]) => `<b style="color:${CORES[k] || '#334155'}">${v}</b> ${k}`).join(' · ')
+      $('fim-msg').innerHTML = (e.parou ? '⏹ Rodada interrompida. ' : '✅ Rodada concluída. ') + (resumo || '')
+    }
+    $('fim-arquivo').textContent = e.arqRelatorio ? 'Relatório salvo em: ' + e.arqRelatorio : ''
+  }
+}
+</script>
+</body>
+</html>
