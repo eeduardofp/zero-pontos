@@ -69,9 +69,14 @@ async function iniciar(corpo) {
   if (estado.fase === 'rodando' || estado.fase === 'aguardando') {
     throw Object.assign(new Error('Já existe uma rodada em andamento'), { code: 409 })
   }
+  const consultarStatus = corpo.status !== false
+  const consultarComercial = corpo.comercial !== false
+  if (!consultarStatus && !consultarComercial) {
+    throw Object.assign(new Error('Ative pelo menos uma consulta (status ou comercial)'), { code: 400 })
+  }
   const d = await dados()
   let alvoIds = null
-  let rotulo = 'todas as placas cadastradas'
+  let rotulo = consultarComercial ? 'todas as placas cadastradas' : 'todas as placas com AIT ativa'
   if (corpo.modo === 'cliente') {
     const cli = d.clientes.find(c => c.id === corpo.id)
     if (!cli) throw Object.assign(new Error('Cliente inválido'), { code: 400 })
@@ -84,8 +89,10 @@ async function iniciar(corpo) {
     rotulo = `placa ${pl.placa}`
   }
 
+  const escopo = consultarStatus && consultarComercial ? 'status + comercial'
+               : consultarComercial ? 'só garimpo comercial' : 'só status das AITs'
   Object.assign(estado, {
-    fase: 'rodando', dryRun: !!corpo.dryRun, rotulo,
+    fase: 'rodando', dryRun: !!corpo.dryRun, rotulo: `${rotulo} · ${escopo}`,
     total: 0, feitas: 0, contadores: {}, ultimas: [], espera: null,
     resumo: null, arqRelatorio: null, parou: false, erro: null
   })
@@ -96,6 +103,8 @@ async function iniciar(corpo) {
   Rodada.executar({
     alvoIds,
     dryRun: !!corpo.dryRun,
+    consultarStatus,
+    consultarComercial,
     emit: (ev, dd) => {
       if (ev === 'inicio') estado.total = dd.total
       if (ev === 'placa') {

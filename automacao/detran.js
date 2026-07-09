@@ -80,6 +80,39 @@ async function extractRecursos(page) {
   })))
 }
 
+// Lê os cards da PÁGINA ATUAL do accordion INFRAÇÕES (usado pelo garimpo
+// comercial). Título ancorado para não casar com "RECURSOS DE INFRAÇÃO".
+// → [{ numeroAuto, descricao, valorMulta, limiteDefesa, texto }]
+// "Limite para defesa em dd/mm/aaaa" aparece solto no item Situação.
+const RE_INFRACOES = /^\s*INFRA[ÇC][ÕO]ES\s*$/i
+
+async function extractInfracoes(page) {
+  const acc = accordionPorTitulo(page, RE_INFRACOES)
+  if (await acc.count() === 0) return []
+  return acc.locator(SEL.card).evaluateAll((cards, sel) =>
+    cards.map(card => {
+      const campos = {}
+      card.querySelectorAll(sel.item).forEach(item => {
+        const t = item.querySelector(sel.itemTitulo)
+        if (!t) return
+        campos[t.textContent.trim()] = item.textContent.replace(t.textContent, '').trim().replace(/\s+/g, ' ')
+      })
+      return {
+        numeroAuto: campos['Número Auto'] || '',
+        descricao: campos['Descrição'] || '',
+        valorTxt: campos['Valor da Multa'] || '',
+        texto: card.textContent.replace(/\s+/g, ' ')
+      }
+    }), SEL
+  ).then(cards => cards.filter(c => c.numeroAuto).map(c => ({
+    numeroAuto: c.numeroAuto,
+    descricao: c.descricao,
+    valorMulta: M.parseValorBR(c.valorTxt),
+    limiteDefesa: M.parseDataBR((/limite para defesa em (\d{1,2}\/\d{1,2}\/\d{4})/i.exec(c.texto) || [])[1] || ''),
+    texto: c.texto
+  })))
+}
+
 // Lê débitos da página atual do accordion DÉBITOS.
 // → [{ codigo, texto, data: 'aaaa-mm-dd', valor: number|null }]
 // Estrutura real (fixture RYT0A74): .lista-debitos__item com células
@@ -219,7 +252,7 @@ async function classificarDossie(page) {
 // em CONSULTAR DOSSIÊ VEÍCULO; o dossiê demora alguns segundos para montar.
 // Retorna: { status: 'ok'|'protegido'|'limite'|'erro', texto } — nunca lança
 // por desfecho de negócio; o orquestrador decide o que fazer com cada status.
-async function abrirDossie(page, placa, renavam) {
+async function abrirDossie(page, placa, renavam, opcoes = {}) {
   await page.goto(`${BASE}?placa=${placa}&renavam=${renavam}`, { waitUntil: 'domcontentloaded' })
   await garantirLogado(page)
 
@@ -246,6 +279,7 @@ async function abrirDossie(page, placa, renavam) {
   if (status === 'ok') {
     await abrirAccordion(page, /RECURSOS DE INFRA/i)
     await abrirAccordion(page, /D[ÉE]BITOS/i)
+    if (opcoes.incluirInfracoes) await abrirAccordion(page, RE_INFRACOES)
     return { status: 'ok', texto: '' }
   }
 
@@ -261,6 +295,9 @@ function todosRecursos(page) {
 function todosDebitos(page) {
   return extrairComPaginacao(page, /D[ÉE]BITOS/i, extractDebitos)
 }
+function todasInfracoes(page) {
+  return extrairComPaginacao(page, RE_INFRACOES, extractInfracoes)
+}
 
 async function screenshotErro(page, placa) {
   fs.mkdirSync(LOGS, { recursive: true })
@@ -272,8 +309,8 @@ async function screenshotErro(page, placa) {
 }
 
 module.exports = {
-  extractRecursos, extractDebitos, isPermissaoNegada, isLimiteAtingido, classificarDossie,
+  extractRecursos, extractDebitos, extractInfracoes, isPermissaoNegada, isLimiteAtingido, classificarDossie,
   instanciaDoProcesso, SEL,
   abrirBrowser, limparSessao, irParaInicio, garantirLogado, abrirDossie,
-  todosRecursos, todosDebitos, screenshotErro
+  todosRecursos, todosDebitos, todasInfracoes, screenshotErro
 }

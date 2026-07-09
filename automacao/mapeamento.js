@@ -88,11 +88,37 @@ function mesmoCodigo(a, b) {
   return contemCodigo(a, b) || contemCodigo(b, a)
 }
 
+// Tabela de valores Zero Pontos: valor da multa → preço do serviço.
+// Casos especiais pela descrição: recusa de bafômetro e exame toxicológico.
+const PRECO_BASE = [
+  { multa: 88.38, preco: 60 },     // leve
+  { multa: 130.16, preco: 80 },    // média
+  { multa: 195.23, preco: 105 },   // grave
+  { multa: 293.47, preco: 160 }    // gravíssima
+]
+const PRECO_GRAVISSIMA_X = { 2: 220, 3: 450, 4: 480, 5: 520, 6: 580, 7: 730, 10: 1050 }
+
+function precoServico(descricao, valorMulta) {
+  const desc = descricao || ''
+  if (/recus/i.test(desc)) return 1500                    // recusa de bafômetro
+  if (/toxicol/i.test(desc)) return 480                   // exame toxicológico
+  if (typeof valorMulta !== 'number') return null
+  const base = PRECO_BASE.find(p => Math.abs(p.multa - valorMulta) < 0.01)
+  if (base) return base.preco
+  const n = Math.round(valorMulta / 293.47)               // gravíssima Nx
+  if (Math.abs(valorMulta - n * 293.47) < 0.05 && PRECO_GRAVISSIMA_X[n]) {
+    return PRECO_GRAVISSIMA_X[n]
+  }
+  return null                                             // fora da tabela → manual
+}
+
 // Garimpo comercial: débito com vencimento no ano corrente, sem recurso de
 // infração vinculado e sem registro conhecido (AITs do workspace + oportunidades
-// já abertas) → possível venda.
+// já abertas) → possível venda. A aba INFRAÇÕES enriquece: descrição, valor
+// oficial da multa, prazo de defesa e preço do serviço pela tabela.
 // debitos: [{codigo, data, valor, texto}] · recursos: [{texto}]
-function garimparOportunidades({ debitos, recursos, codigosConhecidos, ano }) {
+// infracoes: [{numeroAuto, descricao, valorMulta, limiteDefesa}] (opcional)
+function garimparOportunidades({ debitos, recursos, codigosConhecidos, ano, infracoes = [] }) {
   const out = []
   for (const d of debitos) {
     if (!d.codigo || !d.data) continue
@@ -100,7 +126,18 @@ function garimparOportunidades({ debitos, recursos, codigosConhecidos, ano }) {
     if (recursos.some(r => contemCodigo(r.texto, d.codigo))) continue
     if (codigosConhecidos.some(c => mesmoCodigo(c, d.codigo))) continue
     if (out.some(o => mesmoCodigo(o.codigo, d.codigo))) continue
-    out.push({ codigo: d.codigo, data: d.data, valor: d.valor == null ? null : d.valor })
+
+    const inf = infracoes.find(i => mesmoCodigo(i.numeroAuto, d.codigo)) || null
+    const valor = inf && inf.valorMulta != null ? inf.valorMulta
+                : d.valor == null ? null : d.valor
+    out.push({
+      codigo: d.codigo,
+      data: d.data,                                       // vencimento do débito
+      valor,
+      descricao: inf ? inf.descricao || null : null,
+      prazoDefesa: inf ? inf.limiteDefesa || null : null,
+      valorServico: precoServico(inf ? inf.descricao : '', valor)
+    })
   }
   return out
 }
@@ -178,4 +215,4 @@ function montarUpdate(ait, achados) {
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido, parseValorBR, mesmoCodigo, garimparOportunidades }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido, parseValorBR, mesmoCodigo, precoServico, garimparOportunidades }

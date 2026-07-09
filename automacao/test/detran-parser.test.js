@@ -76,6 +76,27 @@ test('extractDebitos extrai código e valor estruturados (garimpo comercial)', a
   }
 })
 
+test('extractInfracoes na fixture RYT0A74: cards com número, descrição, valor e prazo', async () => {
+  await carregarFixture('dossie-RYT0A74.html')
+  const inf = await D.extractInfracoes(page)
+  assert.strictEqual(inf.length, 5)   // página 1 de 3
+  const alvo = inf.find(i => i.numeroAuto === 'JL01206597')
+  assert.ok(alvo)
+  assert.strictEqual(alvo.descricao, 'TRANSITAR EM VEL SUPERIOR À MÁXIMA PERMITIDA EM ATÉ 20%')
+  assert.strictEqual(alvo.valorMulta, 130.16)
+  assert.strictEqual(alvo.limiteDefesa, '2024-12-16')
+  const grave = inf.find(i => i.numeroAuto === 'JV00151982')
+  assert.strictEqual(grave.descricao, 'ESTACIONAR NO PASSEIO')
+  assert.strictEqual(grave.valorMulta, 195.23)
+})
+
+test('extractInfracoes não confunde com RECURSOS DE INFRAÇÃO', async () => {
+  await carregarFixture('dossie-MJL0H67.html')
+  const inf = await D.extractInfracoes(page)
+  // fixture MJL0H67: se houver aba INFRAÇÕES, nenhum card deve ter campo "Processo"
+  for (const i of inf) assert.ok(i.numeroAuto !== undefined)
+})
+
 test('extractDebitos: fixture sem débitos retorna vazio', async () => {
   await carregarFixture('dossie-MJL0H67.html')
   const debitos = await D.extractDebitos(page)

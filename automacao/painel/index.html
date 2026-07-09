@@ -103,6 +103,18 @@
         <div class="sugestoes" id="sugestoes"></div>
       </div>
       <div class="escolhido" id="escolhido"></div>
+      <div class="linha-opcoes" style="justify-content:flex-start;gap:28px">
+        <label class="chave">
+          <input type="checkbox" id="chk-status" checked>
+          <span class="trilho"></span>
+          Status das AITs
+        </label>
+        <label class="chave">
+          <input type="checkbox" id="chk-comercial" checked>
+          <span class="trilho"></span>
+          Garimpo comercial (possíveis vendas)
+        </label>
+      </div>
       <div class="linha-opcoes">
         <label class="chave">
           <input type="checkbox" id="dry" checked>
@@ -221,10 +233,16 @@ $('campo-busca').oninput = () => {
 
 $('btn-iniciar').onclick = async () => {
   if (modo !== 'todas' && !selecionado) { alert('Escolha um ' + (modo === 'cliente' ? 'cliente' : 'placa') + ' na lista.'); return }
+  if (!$('chk-status').checked && !$('chk-comercial').checked) {
+    alert('Ative pelo menos uma consulta: Status das AITs ou Garimpo comercial.'); return
+  }
   $('btn-iniciar').disabled = true
   const resp = await fetch('/api/iniciar', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ modo, id: selecionado ? selecionado.id : null, dryRun: $('dry').checked })
+    body: JSON.stringify({
+      modo, id: selecionado ? selecionado.id : null, dryRun: $('dry').checked,
+      status: $('chk-status').checked, comercial: $('chk-comercial').checked
+    })
   })
   if (!resp.ok) {
     const e = await resp.json().catch(() => ({}))

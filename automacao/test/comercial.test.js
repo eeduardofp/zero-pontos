@@ -90,6 +90,67 @@ test('garimpo: mesmo código repetido nos débitos vira uma oportunidade só', (
   assert.strictEqual(ops.length, 1)
 })
 
+// ── precoServico (tabela de valores Zero Pontos) ──────────────
+test('precoServico mapeia natureza da multa pelo valor', () => {
+  assert.strictEqual(M.precoServico('', 88.38), 60)      // leve
+  assert.strictEqual(M.precoServico('', 130.16), 80)     // média
+  assert.strictEqual(M.precoServico('', 195.23), 105)    // grave
+  assert.strictEqual(M.precoServico('', 293.47), 160)    // gravíssima
+})
+
+test('precoServico mapeia gravíssima com multiplicador', () => {
+  assert.strictEqual(M.precoServico('', 586.94), 220)    // 2x
+  assert.strictEqual(M.precoServico('', 880.41), 450)    // 3x
+  assert.strictEqual(M.precoServico('', 1173.88), 480)   // 4x
+  assert.strictEqual(M.precoServico('', 1467.35), 520)   // 5x
+  assert.strictEqual(M.precoServico('', 1760.82), 580)   // 6x
+  assert.strictEqual(M.precoServico('', 2054.29), 730)   // 7x
+  assert.strictEqual(M.precoServico('', 2934.70), 1050)  // 10x
+})
+
+test('precoServico: recusa de bafômetro e toxicológico têm preço próprio', () => {
+  assert.strictEqual(M.precoServico('RECUSAR-SE A SER SUBMETIDO A TESTE, EXAME CLÍNICO, PERÍCIA OU OUTRO PROCEDIMENTO', 2934.70), 1500)
+  assert.strictEqual(M.precoServico('DEIXAR DE REALIZAR EXAME TOXICOLÓGICO', 1467.35), 480)
+})
+
+test('precoServico: valor desconhecido → null (preencher manualmente)', () => {
+  assert.strictEqual(M.precoServico('', 999.99), null)
+  assert.strictEqual(M.precoServico('', null), null)
+  assert.strictEqual(M.precoServico('QUALQUER DESCRIÇÃO', undefined), null)
+})
+
+// ── enriquecimento com a aba INFRAÇÕES ────────────────────────
+test('garimpo: oportunidade enriquecida com dados da aba INFRAÇÕES', () => {
+  const ops = M.garimparOportunidades({
+    debitos: [deb('JOINVIL-008805-JL01206597-7455', '2026-03-24', 130.16)],
+    recursos: [], codigosConhecidos: [], ano: 2026,
+    infracoes: [{
+      numeroAuto: 'JL01206597',
+      descricao: 'TRANSITAR EM VEL SUPERIOR À MÁXIMA PERMITIDA EM ATÉ 20%',
+      valorMulta: 130.16,
+      limiteDefesa: '2026-02-16'
+    }]
+  })
+  assert.strictEqual(ops.length, 1)
+  assert.strictEqual(ops[0].descricao, 'TRANSITAR EM VEL SUPERIOR À MÁXIMA PERMITIDA EM ATÉ 20%')
+  assert.strictEqual(ops[0].valor, 130.16)
+  assert.strictEqual(ops[0].prazoDefesa, '2026-02-16')
+  assert.strictEqual(ops[0].valorServico, 80)
+  assert.strictEqual(ops[0].data, '2026-03-24')   // vencimento vem dos Débitos
+})
+
+test('garimpo: sem infração casada, campos extras ficam nulos e valor vem do débito', () => {
+  const ops = M.garimparOportunidades({
+    debitos: [deb('UF:RD-000100-R900000001-7455', '2026-09-12', 141.71)],
+    recursos: [], codigosConhecidos: [], ano: 2026,
+    infracoes: [{ numeroAuto: 'OUTRO12345', descricao: 'X', valorMulta: 88.38, limiteDefesa: null }]
+  })
+  assert.strictEqual(ops[0].descricao, null)
+  assert.strictEqual(ops[0].prazoDefesa, null)
+  assert.strictEqual(ops[0].valor, 141.71)
+  assert.strictEqual(ops[0].valorServico, null)   // 141,71 não está na tabela
+})
+
 test('garimpo: mistura — filtra só as defensáveis', () => {
   const ops = M.garimparOportunidades({
     debitos: [
