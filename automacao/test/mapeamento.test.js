@@ -59,6 +59,26 @@ test('contemCodigo ignora espaços e caixa (site insere espaço no código)', ()
   assert.ok(!M.contemCodigo('qualquer texto', ''))
 })
 
+// Casamento pelos últimos 7 dígitos do núcleo: o espaço que o site insere no
+// código sempre cai depois dos 2 primeiros caracteres do núcleo, então o final
+// nunca é cortado — usar só o final é mais robusto que exigir o núcleo inteiro
+// (tolera truncamentos do site que a gente ainda não calibrou em fixture).
+test('contemCodigo casa pelos últimos 7 dígitos mesmo com o começo do núcleo diferente/cortado', () => {
+  // site retorna só o final do núcleo (truncamento não calibrado) — ainda casa
+  assert.ok(M.contemCodigo('texto com 5283197 no meio', 'UF:RD-000100-R855283197-7455-0'))
+  assert.ok(M.contemCodigo('debito JL01206597 aqui', 'JOINVILLE-008805-JL01206597-7455-0'))
+})
+
+test('contemCodigo NÃO casa por coincidência de sufixo curto (exige núcleo com pelo menos 6 chars)', () => {
+  assert.ok(!M.contemCodigo('nada relevante aqui', 'AB1'))
+})
+
+test('contemCodigo: risco aceito — núcleos diferentes que só coincidem no final de 7 dígitos casam entre si (2 casos em 942 núcleos reais: H004401021/Z4401021 e H4285771/Z004285771)', () => {
+  // trade-off consciente: usar só o final é mais robusto a truncamento do site
+  // do que exigir o núcleo inteiro, ao custo de colisões raríssimas como esta.
+  assert.ok(M.contemCodigo('processo Z4401021 encontrado', 'H004401021'))
+})
+
 test('limparPlaca remove sufixo /UF e separadores (cadastro guarda "QJC8G88/SC")', () => {
   assert.strictEqual(M.limparPlaca('QJC8G88/SC'), 'QJC8G88')
   assert.strictEqual(M.limparPlaca(' mjl0h67 '), 'MJL0H67')

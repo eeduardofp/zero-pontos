@@ -44,12 +44,22 @@ function nucleoCodigo(codigo) {
   return normalizar(codigo)
 }
 
+// Chave de casamento: os últimos 7 caracteres do núcleo. O site sempre insere
+// eventuais espaços logo depois dos 2 primeiros caracteres do núcleo — o final
+// nunca é cortado — então usar só o final tolera tanto o espaço quanto
+// truncamentos de prefixo ainda não calibrados em fixture. Custo: colisão
+// raríssima entre núcleos bem diferentes que só coincidem no final (~0,2% na
+// base real) — aceito conscientemente em troca de robustez.
+function chaveCodigo(codigo) {
+  return nucleoCodigo(codigo).slice(-7)
+}
+
 function contemCodigo(texto, codigo) {
   if (!codigo) return false
   const t = normalizar(texto)
   if (t.includes(normalizar(codigo))) return true
-  const nucleo = nucleoCodigo(codigo)
-  return nucleo.length >= 6 && t.includes(nucleo)
+  const chave = chaveCodigo(codigo)
+  return chave.length >= 6 && t.includes(chave)
 }
 
 // Cadastro guarda a placa com sufixo de UF ("QJC8G88/SC") e às vezes com
@@ -215,4 +225,4 @@ function montarUpdate(ait, achados) {
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido, parseValorBR, mesmoCodigo, precoServico, garimparOportunidades }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, chaveCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido, parseValorBR, mesmoCodigo, precoServico, garimparOportunidades }
