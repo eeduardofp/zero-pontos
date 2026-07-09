@@ -116,19 +116,27 @@ function montarUpdate(ait, achados) {
     merged = { ...merged, defesa_previa: 'Indeferido' }
   }
 
-  // Abertura da próxima etapa: DP indeferida deixa a JARI como "Não
-  // realizado" (nunca vazia) — com vencimento definido, o workspace joga a
-  // AIT na fila de recursos. Só preenche etapa vazia: "Aguardando" já é
-  // recurso protocolado, não sobrescreve.
-  // Vale só para DP→JARI: o site mostra a JARI de forma confiável, então se
-  // ela for feita o próprio site corrige o "Não realizado".
-  // A 2ª instância NUNCA é aberta automaticamente — o site é cego para ela,
-  // então um "Não realizado" colocado por engano nunca se corrigiria e
-  // viraria defesa fantasma na fila. A 2ª só muda quando o site exibe uma
-  // decisão real (tratada no loop de achados acima).
+  // Abertura da próxima etapa: um indeferimento deixa a etapa seguinte como
+  // "Não realizado" (nunca vazia) — com vencimento definido, o workspace joga
+  // a AIT na fila de recursos. Só preenche etapa vazia ("Aguardando" já é
+  // recurso protocolado, não sobrescreve).
+  //
+  // DP→JARI: o site mostra a JARI de forma confiável; abre sempre que DP está
+  // indeferida e a JARI está vazia (se a JARI for feita, o site corrige).
+  //
+  // JARI→2ª: o site é CEGO para o status da 2ª. Um "Não realizado" colocado
+  // por engano nunca se corrigiria e viraria defesa fantasma. Por isso a 2ª
+  // só é aberta quando a JARI foi indeferida NESTE run (o programa acabou de
+  // mudar o status) — aí subentende-se que a 2ª ainda não foi feita. Se a
+  // JARI já era indeferida antes, não mexe.
   if (merged.defesa_previa === 'Indeferido' && !merged.jari) {
     fields.jari = 'Não realizado'
     merged = { ...merged, jari: 'Não realizado' }
+  }
+  const jariRecemIndeferida = ait.jari !== 'Indeferido' && merged.jari === 'Indeferido'
+  if (jariRecemIndeferida && !merged.segunda_instancia) {
+    fields.segunda_instancia = 'Não realizado'
+    merged = { ...merged, segunda_instancia: 'Não realizado' }
   }
 
   if (!ait.encerrado && deveEncerrar(merged)) fields.encerrado = true

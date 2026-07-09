@@ -183,35 +183,44 @@ test('montarUpdate: não sobrescreve JARI já protocolada com "Não realizado"',
   assert.strictEqual(up.jari, undefined)
 })
 
-test('montarUpdate: JARI indeferida NÃO abre 2ª (site é cego para a 2ª)', () => {
-  // site não mostra status da 2ª de forma confiável — um "Não realizado"
-  // colocado por engano nunca se corrigiria e viraria defesa fantasma
+test('montarUpdate: JARI recém-indeferida (era Aguardando) abre 2ª como "Não realizado"', () => {
+  // programa mudou a JARI agora → a 2ª ainda não foi feita → vai pra fila
   const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Aguardando', segunda_instancia: '', encerrado: false }
   const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: '2026-06-03' }])
   assert.strictEqual(up.jari, 'Indeferido')
-  assert.strictEqual(up.segunda_instancia, undefined)   // NÃO abre
+  assert.strictEqual(up.segunda_instancia, 'Não realizado')
+  assert.strictEqual(up.vencimento, '2026-06-03')
   assert.strictEqual(up.encerrado, undefined)
 })
 
-test('montarUpdate: JARI indeferida não sobrescreve 2ª já "Aguardando"', () => {
-  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Indeferido', segunda_instancia: 'Aguardando', encerrado: false }
+test('montarUpdate: JARI já indeferida antes NÃO reabre a 2ª (site cego para a 2ª)', () => {
+  // JARI não mudou neste run → não sabemos se a 2ª foi feita → não mexe.
+  // Evita defesa fantasma quando a 2ª já foi protocolada fora do site.
+  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Indeferido', segunda_instancia: '', encerrado: false }
   const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: '2026-06-03' }])
-  assert.strictEqual(up.segunda_instancia, undefined)   // intocada
+  assert.strictEqual(up.segunda_instancia, undefined)   // NÃO reabre
 })
 
-test('montarUpdate: 2ª só muda quando o site mostra decisão real', () => {
+test('montarUpdate: JARI recém-indeferida não sobrescreve 2ª já "Aguardando"', () => {
+  const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Aguardando', segunda_instancia: 'Aguardando', encerrado: false }
+  const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: null }])
+  assert.strictEqual(up.jari, 'Indeferido')
+  assert.strictEqual(up.segunda_instancia, undefined)   // intocada (só abre etapa vazia)
+})
+
+test('montarUpdate: 2ª muda quando o site mostra decisão real', () => {
   const ait = { codigo: 'X', defesa_previa: 'Indeferido', jari: 'Indeferido', segunda_instancia: 'Aguardando', encerrado: false }
   const up = M.montarUpdate(ait, [{ instancia: 'segunda_instancia', resultado: 'DEFERIDO em 06/06/2026', dataLimite: null }])
   assert.strictEqual(up.segunda_instancia, 'Deferido')
   assert.strictEqual(up.encerrado, true)
 })
 
-test('montarUpdate: cascata sem abertura da 2ª (site só mostra JARI indeferida)', () => {
+test('montarUpdate: cascata + abertura da 2ª (site só mostra JARI recém-indeferida)', () => {
   const ait = { codigo: 'X', defesa_previa: 'Aguardando', jari: '', segunda_instancia: '', encerrado: false }
   const up = M.montarUpdate(ait, [{ instancia: 'jari', resultado: 'INDEFERIDO em 06/04/2026', dataLimite: null }])
-  assert.strictEqual(up.defesa_previa, 'Indeferido')     // cascata (DP confiável)
+  assert.strictEqual(up.defesa_previa, 'Indeferido')       // cascata (DP confiável)
   assert.strictEqual(up.jari, 'Indeferido')
-  assert.strictEqual(up.segunda_instancia, undefined)    // 2ª NÃO abre
+  assert.strictEqual(up.segunda_instancia, 'Não realizado') // JARI era vazia → abre
 })
 
 test('montarUpdate: nada encontrado no site → só ultima_att', () => {
