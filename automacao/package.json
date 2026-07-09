@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test",
     "captura": "node captura.js",
+    "painel": "node painel.js",
     "consultar": "node index.js",
     "dry-run": "node index.js --dry-run"
   },
