@@ -511,13 +511,15 @@ async function salvarCliente() {
     nome: nome.toUpperCase(),
     contato: document.getElementById('f-contato').value.trim(),
     email: document.getElementById('f-email').value.trim(),
+    cpf: document.getElementById('f-cpf').value.trim(),
+    nascimento: document.getElementById('f-nascimento').value || null,
     cadastro: Data.today()
   }
   try {
     const saved = await API.createCliente(obj)
     Data.addCliente(saved)
     UI.updateStats()
-    ;['f-nome', 'f-contato', 'f-email'].forEach(id => document.getElementById(id).value = '')
+    ;['f-nome', 'f-contato', 'f-email', 'f-cpf', 'f-nascimento'].forEach(id => document.getElementById(id).value = '')
     UI.notif('Cliente cadastrado!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
 }
@@ -599,7 +601,8 @@ function openCliente(cid) {
     return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div><span style="font-family:var(--mono);font-weight:500;color:var(--text)">${pl.placa}</span>
-        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:12px">Renavan: ${pl.renavan}</span></div>
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:12px">Renavan: ${pl.renavan}</span>
+        <span onclick="editarPlaca('${pl.id}','${cid}')" style="font-size:11px;color:var(--blue);cursor:pointer;margin-left:10px">✎ editar</span></div>
         <span class="badge b-blue">${paits.length} AITs</span>
       </div>
       <table style="width:100%;border-collapse:collapse">${rows}${more}</table></div>`
@@ -614,6 +617,7 @@ function openCliente(cid) {
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px">' +
     '<div class="modal-title">' + c.nome + '</div>' +
     '<button class="btn btn-ghost btn-sm" id="cl-edit-btn">✎ Editar</button>' +
+    '<button class="btn btn-danger btn-sm" id="cl-del-btn">Excluir</button>' +
     '</div>' +
     '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
     contatoHTML + fatHTML +
@@ -622,6 +626,8 @@ function openCliente(cid) {
   )
   const editBtn = document.getElementById('cl-edit-btn')
   if (editBtn) editBtn.onclick = function() { editarCliente(cid) }
+  const delCliBtn = document.getElementById('cl-del-btn')
+  if (delCliBtn) delCliBtn.onclick = function() { excluirCliente(cid) }
 }
 
 function editarCliente(cid) {
@@ -635,9 +641,13 @@ function editarCliente(cid) {
     '<div class="form-group">',
     '<label class="form-label">Contato / WhatsApp</label>',
     '<input class="form-ctrl" id="ec-contato" value="' + (c.contato || '') + '" placeholder="(47) 99999-9999"></div>',
-    '<div class="form-group" style="margin-bottom:14px">',
+    '<div class="form-group">',
     '<label class="form-label">E-mail</label>',
     '<input class="form-ctrl" id="ec-email" type="email" value="' + (c.email || '') + '" placeholder="cliente@email.com"></div>',
+    '<div class="form-row" style="margin-bottom:14px">',
+    '<div><label class="form-label">CPF</label><input class="form-ctrl" id="ec-cpf" value="' + (c.cpf || '') + '" placeholder="000.000.000-00"></div>',
+    '<div><label class="form-label">Data de nascimento</label><input class="form-ctrl" id="ec-nascimento" type="date" value="' + (c.nascimento || '') + '"></div>',
+    '</div>',
     '<div style="display:flex;gap:8px">',
     '<button class="btn btn-primary" id="ec-save">Salvar</button>',
     '<button class="btn btn-ghost" id="ec-cancel">Cancelar</button>',
@@ -652,8 +662,10 @@ async function salvarEdicaoCliente(cid) {
   if (!nome) { UI.notif('Nome obrigatório', 'error'); return }
   const fields = {
     nome,
-    contato: document.getElementById('ec-contato').value.trim(),
-    email:   document.getElementById('ec-email').value.trim()
+    contato:    document.getElementById('ec-contato').value.trim(),
+    email:      document.getElementById('ec-email').value.trim(),
+    cpf:        document.getElementById('ec-cpf').value.trim(),
+    nascimento: document.getElementById('ec-nascimento').value || null
   }
   try {
     await Auth.getClient().from('clientes').update(fields).eq('id', cid)
@@ -690,11 +702,13 @@ function editarPlaca(pid, cid) {
     '<div style="display:flex;gap:8px">',
     '<button class="btn btn-primary" id="ep-save">Salvar</button>',
     '<button class="btn btn-ghost" id="ep-cancel">Cancelar</button>',
+    '<button class="btn btn-danger" id="ep-del">Excluir placa</button>',
     '</div>'
   ]
   UI.openModal(parts.join(''))
   document.getElementById('ep-save').onclick = function() { salvarEdicaoPlaca(pid, cid) }
   document.getElementById('ep-cancel').onclick = function() { openCliente(cid) }
+  document.getElementById('ep-del').onclick = function() { excluirPlaca(pid, cid) }
 }
 async function salvarEdicaoPlaca(pid, cid) {
   const placa   = document.getElementById('ep-placa').value.trim().toUpperCase()
@@ -759,10 +773,13 @@ function openAIT(aid) {
       '<div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="' + (a.valor || '') + '" placeholder="0,00" style="font-size:12px"></div>' +
       '<div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="' + (a.observacao || '') + '" style="font-size:12px"></div>' +
     '</div>' +
-    '<button class="btn btn-primary" id="ait-save-btn">Salvar alterações</button>'
+    '<button class="btn btn-primary" id="ait-save-btn">Salvar alterações</button>' +
+    '<button class="btn btn-danger" id="ait-del-btn" style="margin-left:8px">Excluir AIT</button>'
   )
   const aitSaveBtn = document.getElementById('ait-save-btn')
   if (aitSaveBtn) aitSaveBtn.onclick = function() { salvarEdicaoAIT(aid) }
+  const aitDelBtn = document.getElementById('ait-del-btn')
+  if (aitDelBtn) aitDelBtn.onclick = function() { excluirAIT(aid) }
 }
 
 async function salvarEdicaoAIT(aid) {
@@ -895,6 +912,68 @@ async function confirmarRecurso(aid, etKey) {
     renderRecursos()
     UI.notif('Recurso protocolado — AIT voltou para verificação!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
+// ─── EXCLUSÕES ───────────────────────────────────────────────
+async function excluirAIT(aid) {
+  if (!confirm('Excluir esta AIT? Esta ação não pode ser desfeita.')) return
+  try {
+    const { error } = await Auth.getClient().from('aits').delete().eq('id', aid)
+    if (error) throw error
+    // Remover do cache local
+    const aits = Data.getAITs()
+    const idx = aits.findIndex(a => a.id === aid)
+    if (idx >= 0) aits.splice(idx, 1)
+    UI.updateStats()
+    UI.closeModal()
+    renderAITs(1)
+    UI.notif('AIT excluída!')
+  } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
+async function excluirPlaca(pid, cid) {
+  // Verificar se tem AITs vinculadas
+  const aitsVinculadas = Data.aitsDaPlaca(pid)
+  if (aitsVinculadas.length > 0) {
+    alert('Não é possível excluir esta placa pois ela possui ' + aitsVinculadas.length + ' AIT(s) vinculada(s). Exclua as AITs primeiro.')
+    return
+  }
+  if (!confirm('Excluir esta placa? Esta ação não pode ser desfeita.')) return
+  try {
+    const { error } = await Auth.getClient().from('placas').delete().eq('id', pid)
+    if (error) throw error
+    // Remover do cache local
+    const placas = Data.getPlacas()
+    const idx = placas.findIndex(p => p.id === pid)
+    if (idx >= 0) placas.splice(idx, 1)
+    UI.closeModal()
+    UI.notif('Placa excluída!')
+  } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
+async function excluirCliente(cid) {
+  // Verificar se tem placas ou AITs vinculadas
+  const placasVinculadas = Data.placasDe(cid)
+  const aitsVinculadas = Data.aitsDe(cid)
+  if (placasVinculadas.length > 0 || aitsVinculadas.length > 0) {
+    alert('Não é possível excluir este cliente pois ele possui ' +
+      placasVinculadas.length + ' placa(s) e ' +
+      aitsVinculadas.length + ' AIT(s) vinculada(s).\n\nExclua as AITs e placas primeiro.')
+    return
+  }
+  if (!confirm('Excluir este cliente? Esta ação não pode ser desfeita.')) return
+  try {
+    const { error } = await Auth.getClient().from('clientes').delete().eq('id', cid)
+    if (error) throw error
+    // Remover do cache local
+    const clientes = Data.getClientes()
+    const idx = clientes.findIndex(c => c.id === cid)
+    if (idx >= 0) clientes.splice(idx, 1)
+    UI.updateStats()
+    UI.closeModal()
+    renderClientes(1)
+    UI.notif('Cliente excluído!')
+  } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
 }
 
 // ─── EXPORTAÇÃO EXCEL ────────────────────────────────────────
