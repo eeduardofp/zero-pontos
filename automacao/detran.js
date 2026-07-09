@@ -81,21 +81,31 @@ async function extractRecursos(page) {
 }
 
 // Lê débitos da página atual do accordion DÉBITOS.
-// → [{ texto, data: 'aaaa-mm-dd' }] — código da AIT procurado por substring em `texto`.
-// PROVISÓRIO: só o estado vazio foi capturado; estrutura de débitos reais
-// será calibrada com fixture nova (extração genérica: bloco com data).
+// → [{ codigo, texto, data: 'aaaa-mm-dd', valor: number|null }]
+// Estrutura real (fixture RYT0A74): .lista-debitos__item com células
+// código | vencimento | valor | botões. O 1º item é o cabeçalho da
+// tabela (só <strong>) — cai fora por não ter data.
 async function extractDebitos(page) {
   const acc = accordionPorTitulo(page, /D[ÉE]BITOS/i)
   if (await acc.count() === 0) return []
   if (await acc.locator(SEL.debitosVazio).count() > 0) return []
-  const blocos = await acc.locator('.lista-debitos > *, ' + SEL.card).evaluateAll(els =>
-    els.map(el => el.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  const blocos = await acc.locator('.lista-debitos__item, ' + SEL.card).evaluateAll(els =>
+    els.map(el => {
+      const celulas = [...el.querySelectorAll(':scope > div')]
+        .map(c => c.textContent.replace(/\s+/g, ' ').trim())
+      return { celulas, texto: el.textContent.replace(/\s+/g, ' ').trim() }
+    }).filter(b => b.texto)
   )
   const out = []
-  for (const texto of blocos) {
-    const m = /(\d{1,2}\/\d{1,2}\/\d{4})/.exec(texto)
+  for (const b of blocos) {
+    const m = /(\d{1,2}\/\d{1,2}\/\d{4})/.exec(b.texto)
     const data = m ? M.parseDataBR(m[1]) : null
-    if (data) out.push({ texto, data })
+    if (!data) continue
+    // célula do código: a que precede o vencimento e não é rótulo da tabela
+    const idxData = b.celulas.findIndex(c => /\d{1,2}\/\d{1,2}\/\d{4}/.test(c))
+    const codigo = idxData > 0 ? b.celulas[idxData - 1] : ''
+    const valorCel = b.celulas.find(c => /R\$/.test(c)) || b.texto
+    out.push({ codigo, texto: b.texto, data, valor: M.parseValorBR(valorCel) })
   }
   return out
 }

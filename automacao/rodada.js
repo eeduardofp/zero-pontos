@@ -16,6 +16,14 @@ const STATUS_LABEL = a =>
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
+// Mesmo formato de id do app (data.js: genId)
+const genId = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+
+const fmtBR = iso => {
+  const [a, m, d] = (iso || '').split('-')
+  return d ? `${d}/${m}/${a}` : iso || '—'
+}
+
 // opcoes: {
 //   alvoIds: Set<placaId>|null,          // null = todas
 //   dryRun: boolean,
@@ -36,7 +44,21 @@ async function executar(opcoes) {
     if (!porPlaca.has(a.placa_id)) porPlaca.set(a.placa_id, [])
     porPlaca.get(a.placa_id).push(a)
   }
-  const fila = [...porPlaca.keys()].filter(id => !alvoIds || alvoIds.has(id))
+  // Fila: TODAS as placas cadastradas (garimpo comercial acha multa nova
+  // também em veículo sem AIT ativa) — bloqueadas/inválidas caem nos
+  // filtros do laço. Placas com AIT ativa primeiro (prioridade se o
+  // limite de consultas encerrar a rodada no meio).
+  const fila = placas
+    .map(p => p.id)
+    .filter(id => !alvoIds || alvoIds.has(id))
+    .sort((a, b) => (porPlaca.has(b) ? 1 : 0) - (porPlaca.has(a) ? 1 : 0))
+
+  // Base do garimpo: tudo que já conhecemos não é oportunidade
+  const comercial = await S.carregarComercial()
+  const codigosConhecidos = [
+    ...comercial.codigosAits,
+    ...comercial.oportunidades.map(o => o.codigo_ait).filter(Boolean)
+  ]
 
   // Login obrigatório e limpo a cada execução: apaga a sessão anterior
   // para o usuário poder entrar com a conta que quiser.
@@ -54,7 +76,9 @@ async function executar(opcoes) {
     return c ? c.nome : '—'
   }
   const marcarTodas = (placa, tipo, detalhe) => {
-    const novos = porPlaca.get(placa.id).map(a => ({
+    // placa sem AIT ativa gera uma linha única (senão sumiria do relatório)
+    const alvo = porPlaca.get(placa.id) || [{ codigo: '—' }]
+    const novos = alvo.map(a => ({
       cliente: nomeCliente(placa), placa: placa.placa, codigo: a.codigo, tipo, detalhe
     }))
     itens.push(...novos)
@@ -68,7 +92,7 @@ async function executar(opcoes) {
 
   for (const placaId of fila) {
     if (deveParar()) { parou = true; break }
-    const aitsDaPlaca = porPlaca.get(placaId)
+    const aitsDaPlaca = porPlaca.get(placaId) || []
     const placa = placas.find(p => p.id === placaId)
     n++
     let novos = []
@@ -118,7 +142,7 @@ async function executar(opcoes) {
       }
 
       if (desfecho.status === 'ok') {
-        novos = await processarDossie(page, placa, aitsDaPlaca, clientes, dryRun)
+        novos = await processarDossie(page, placa, aitsDaPlaca, clientes, dryRun, codigosConhecidos)
         itens.push(...novos)
         resolvido = true
       } else if (desfecho.status === 'protegido') {
@@ -167,17 +191,16 @@ async function executar(opcoes) {
 }
 
 // Consulta um dossiê já aberto e devolve os itens de relatório das AITs da placa.
-async function processarDossie(page, placa, aits, clientes, dryRun) {
+// Além da esteira de recursos, garimpa oportunidades comerciais: débito com
+// vencimento no ano corrente, sem recurso vinculado e desconhecido do workspace.
+async function processarDossie(page, placa, aits, clientes, dryRun, codigosConhecidos) {
   const cliente = clientes.find(c => c.id === placa.cliente_id)
   const nomeCliente = cliente ? cliente.nome : '—'
   const itens = []
 
   const recursos = await D.todosRecursos(page)
-  const precisaDebitos = recursos.some(r => {
-    const m = M.mapResultado(r.resultado)
-    return m && m.precisaDataLimite
-  })
-  const debitos = precisaDebitos ? await D.todosDebitos(page) : []
+  // débitos sempre: além do vencimento das AITs, alimentam o garimpo comercial
+  const debitos = await D.todosDebitos(page)
 
   for (const ait of aits) {
     // cards do site que citam o código desta AIT e pertencem a uma etapa da esteira.
@@ -209,6 +232,33 @@ async function processarDossie(page, placa, aits, clientes, dryRun) {
       antes, depois: STATUS_LABEL({ ...ait, ...up }),
       vencimento: up.vencimento || '',
       detalhe: up.encerrado ? 'AIT encerrada' : ''
+    })
+  }
+
+  // ── Garimpo comercial: multa nova sem defesa = possível venda ──
+  const achadosComercial = M.garimparOportunidades({
+    debitos, recursos, codigosConhecidos, ano: new Date().getFullYear()
+  })
+  for (const o of achadosComercial) {
+    if (!dryRun) {
+      await S.criarOportunidade({
+        id: genId('op'),
+        cliente_id: placa.cliente_id || null,
+        placa_id: placa.id,
+        codigo_ait: o.codigo,
+        descricao: 'Garimpada pela consulta automática',
+        valor_ait: o.valor,
+        prazo_vencimento: o.data,
+        data_identificacao: M.hoje(),
+        status: 'Aberta'
+      })
+    }
+    codigosConhecidos.push(o.codigo)   // não duplica se reaparecer na rodada
+    itens.push({
+      cliente: nomeCliente, placa: placa.placa, codigo: o.codigo,
+      tipo: 'oportunidade',
+      vencimento: o.data,
+      detalhe: `Multa sem defesa — vence ${fmtBR(o.data)}${o.valor != null ? ` · R$ ${o.valor.toFixed(2).replace('.', ',')}` : ''}`
     })
   }
   return itens

@@ -47,17 +47,16 @@ async function lerCorpo(req) {
   return corpo ? JSON.parse(corpo) : {}
 }
 
-// Clientes e placas com AITs ativas (para o dropdown do painel)
+// Clientes e placas para o dropdown do painel. TODAS as placas cadastradas —
+// o garimpo comercial acha multa nova também em veículo sem AIT ativa.
 async function dados() {
   await S.login()
-  const { aits, placas, clientes } = await S.carregarAtivas()
-  const ativas = new Set(aits.map(a => a.placa_id))
-  const placasAtivas = placas.filter(p => ativas.has(p.id))
+  const { placas, clientes } = await S.carregarAtivas()
   return {
     clientes: clientes
-      .filter(c => placasAtivas.some(p => p.cliente_id === c.id))
-      .map(c => ({ id: c.id, nome: c.nome, placas: placasAtivas.filter(p => p.cliente_id === c.id).length })),
-    placas: placasAtivas.map(p => ({
+      .filter(c => placas.some(p => p.cliente_id === c.id))
+      .map(c => ({ id: c.id, nome: c.nome, placas: placas.filter(p => p.cliente_id === c.id).length })),
+    placas: placas.map(p => ({
       id: p.id,
       clienteId: p.cliente_id,
       placa: p.placa,
@@ -72,7 +71,7 @@ async function iniciar(corpo) {
   }
   const d = await dados()
   let alvoIds = null
-  let rotulo = 'todas as AITs ativas'
+  let rotulo = 'todas as placas cadastradas'
   if (corpo.modo === 'cliente') {
     const cli = d.clientes.find(c => c.id === corpo.id)
     if (!cli) throw Object.assign(new Error('Cliente inválido'), { code: 400 })

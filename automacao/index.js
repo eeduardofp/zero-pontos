@@ -17,7 +17,7 @@ function perguntar(msg) {
 // Menu inicial: todas as AITs, um cliente ou uma placa.
 async function escolherAlvo(clientes, placas, porPlaca) {
   console.log('\nO que consultar?')
-  console.log(' [1] Todas as AITs ativas  (Enter = padrão)')
+  console.log(' [1] Todas as placas cadastradas  (Enter = padrão)')
   console.log(' [2] Cliente específico')
   console.log(' [3] Placa específica')
   const op = (await perguntar('Opção: ')).trim()
@@ -32,9 +32,8 @@ async function escolherAlvo(clientes, placas, porPlaca) {
       const cli = achados[nEsc - 1]
       if (!cli) { console.log('Opção inválida.'); continue }
       const ids = new Set(Sel.placasDoCliente(placas, cli.id).map(p => p.id))
-      const ativas = [...ids].filter(id => porPlaca.has(id))
-      if (!ativas.length) { console.log(`${cli.nome} não tem AITs ativas. Tente outro.`); continue }
-      console.log(`→ ${cli.nome}: ${ativas.length} placa(s) com AITs ativas`)
+      if (!ids.size) { console.log(`${cli.nome} não tem placas cadastradas. Tente outro.`); continue }
+      console.log(`→ ${cli.nome}: ${ids.size} placa(s)`)
       return { ids, rotulo: `cliente ${cli.nome}` }
     }
   }
@@ -42,8 +41,8 @@ async function escolherAlvo(clientes, placas, porPlaca) {
   if (op === '3') {
     while (true) {
       const termo = await perguntar('\nPlaca (ou parte): ')
-      const achadas = Sel.buscarPlacas(placas, termo).filter(p => porPlaca.has(p.id)).slice(0, 15)
-      if (!achadas.length) { console.log('Nenhuma placa com AITs ativas encontrada. Tente de novo.'); continue }
+      const achadas = Sel.buscarPlacas(placas, termo).slice(0, 15)
+      if (!achadas.length) { console.log('Nenhuma placa encontrada. Tente de novo.'); continue }
       let alvo = achadas[0]
       if (achadas.length > 1) {
         achadas.forEach((p, i) => console.log(` [${i + 1}] ${p.placa}`))
@@ -56,7 +55,7 @@ async function escolherAlvo(clientes, placas, porPlaca) {
     }
   }
 
-  return { ids: null, rotulo: 'todas as AITs ativas' }
+  return { ids: null, rotulo: 'todas as placas cadastradas' }
 }
 
 async function main() {

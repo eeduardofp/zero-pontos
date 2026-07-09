@@ -4,6 +4,7 @@ const path = require('path')
 const { execSync } = require('child_process')
 
 const COR = {
+  oportunidade: '#0ea5e9',
   atualizado: '#16a34a',
   'sem-mudanca': '#64748b',
   'nao-encontrado': '#d97706',

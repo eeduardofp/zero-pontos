@@ -28,14 +28,17 @@ function normalizar(s) {
 }
 
 // Núcleo do identificador: nos códigos estruturados
-// (PREFIXO-NNNNNN-NÚCLEO-EEEE-D) é o 3º segmento contando do fim.
-// A seção Débitos trunca o dígito final e abrevia o prefixo
-// ("JOINVIL-...-7455" vs "JOINVILLE-...-7455-0"), então o casamento
-// confiável é pelo núcleo. Sem estrutura → código inteiro normalizado.
+// (PREFIXO-NNNNNN-NÚCLEO-EEEE-D) é o único segmento longo com letras E
+// dígitos misturados (os demais são só letras ou só dígitos). A posição
+// varia com truncamento — Débitos corta o dígito final e abrevia o prefixo
+// ("JOINVIL-...-7455" vs "JOINVILLE-...-7455-0") — mas o formato não.
+// Ambíguo ou sem estrutura → 3º do fim / código inteiro normalizado.
 function nucleoCodigo(codigo) {
-  const partes = String(codigo == null ? '' : codigo).split('-')
+  const partes = String(codigo == null ? '' : codigo).split('-').map(normalizar)
+  const cand = partes.filter(p => p.length >= 6 && /[A-Z]/.test(p) && /\d/.test(p))
+  if (cand.length === 1 && partes.length > 1) return cand[0]
   if (partes.length >= 4) {
-    const nucleo = normalizar(partes[partes.length - 3])
+    const nucleo = partes[partes.length - 3]
     if (nucleo.length >= 6) return nucleo
   }
   return normalizar(codigo)
@@ -69,6 +72,37 @@ function placaValida(p) {
 // Renavam: 9 a 11 dígitos, validado já limpo.
 function renavamValido(r) {
   return /^\d{9,11}$/.test(limparRenavam(r))
+}
+
+// "R$ 1.195,23" → 1195.23; texto sem número → null
+function parseValorBR(txt) {
+  const m = /(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})/.exec(txt || '')
+  if (!m) return null
+  return parseFloat(m[1].replace(/\./g, '') + '.' + m[2])
+}
+
+// Dois códigos apontam para o mesmo auto? Casa nos dois sentidos porque
+// Débitos trunca ("JOINVIL-...-7455" vs "JOINVILLE-...-7455-0").
+function mesmoCodigo(a, b) {
+  if (!a || !b) return false
+  return contemCodigo(a, b) || contemCodigo(b, a)
+}
+
+// Garimpo comercial: débito com vencimento no ano corrente, sem recurso de
+// infração vinculado e sem registro conhecido (AITs do workspace + oportunidades
+// já abertas) → possível venda.
+// debitos: [{codigo, data, valor, texto}] · recursos: [{texto}]
+function garimparOportunidades({ debitos, recursos, codigosConhecidos, ano }) {
+  const out = []
+  for (const d of debitos) {
+    if (!d.codigo || !d.data) continue
+    if (!d.data.startsWith(`${ano}-`)) continue
+    if (recursos.some(r => contemCodigo(r.texto, d.codigo))) continue
+    if (codigosConhecidos.some(c => mesmoCodigo(c, d.codigo))) continue
+    if (out.some(o => mesmoCodigo(o.codigo, d.codigo))) continue
+    out.push({ codigo: d.codigo, data: d.data, valor: d.valor == null ? null : d.valor })
+  }
+  return out
 }
 
 function parseDataBR(txt) {
@@ -144,4 +178,4 @@ function montarUpdate(ait, achados) {
   return fields
 }
 
-module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido }
+module.exports = { mapResultado, parseDataBR, hoje, deveEncerrar, montarUpdate, normalizar, nucleoCodigo, contemCodigo, limparPlaca, limparRenavam, placaValida, renavamValido, parseValorBR, mesmoCodigo, garimparOportunidades }

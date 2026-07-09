@@ -32,4 +32,23 @@ async function updateAIT(id, fields) {
   if (error) throw new Error(`Update AIT ${id} falhou: ${error.message}`)
 }
 
-module.exports = { login, carregarAtivas, updateAIT }
+// Base do garimpo comercial: códigos de TODAS as AITs (encerradas inclusive —
+// serviço já vendido não é oportunidade) + oportunidades já registradas.
+async function carregarComercial() {
+  const [aits, ops] = await Promise.all([
+    client.from('aits').select('codigo'),
+    client.from('oportunidades').select('id, codigo_ait, placa_id, status')
+  ])
+  for (const r of [aits, ops]) if (r.error) throw r.error
+  return {
+    codigosAits: aits.data.map(a => a.codigo).filter(Boolean),
+    oportunidades: ops.data
+  }
+}
+
+async function criarOportunidade(obj) {
+  const { error } = await client.from('oportunidades').insert(obj)
+  if (error) throw new Error(`Insert oportunidade ${obj.codigo_ait} falhou: ${error.message}`)
+}
+
+module.exports = { login, carregarAtivas, updateAIT, carregarComercial, criarOportunidade }

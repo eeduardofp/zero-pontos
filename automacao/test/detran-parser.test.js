@@ -62,6 +62,20 @@ test('extractDebitos na fixture RYT0A74: 9 débitos com data ISO', async () => {
   assert.strictEqual(alvo.data, '2025-10-20')
 })
 
+test('extractDebitos extrai código e valor estruturados (garimpo comercial)', async () => {
+  await carregarFixture('dossie-RYT0A74.html')
+  const deb = await D.extractDebitos(page)
+  const d = deb.find(x => x.codigo === 'JOINVIL-008805-JL01206597-7455')
+  assert.ok(d, 'débito deve expor o código do auto')
+  assert.strictEqual(d.data, '2025-03-24')
+  assert.strictEqual(d.valor, 130.16)
+  // todos os débitos da fixture têm código e valor
+  for (const x of deb) {
+    assert.ok(x.codigo.length >= 6, `código vazio em: ${x.texto.slice(0, 40)}`)
+    assert.ok(typeof x.valor === 'number', `valor ausente em: ${x.texto.slice(0, 40)}`)
+  }
+})
+
 test('extractDebitos: fixture sem débitos retorna vazio', async () => {
   await carregarFixture('dossie-MJL0H67.html')
   const debitos = await D.extractDebitos(page)
