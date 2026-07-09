@@ -116,17 +116,19 @@ function montarUpdate(ait, achados) {
     merged = { ...merged, defesa_previa: 'Indeferido' }
   }
 
-  // Abertura da próxima etapa: indeferido deixa a etapa seguinte como
-  // "Não realizado" (nunca vazia) — com vencimento definido, o workspace
-  // joga a AIT automaticamente na fila de recursos. Só preenche etapa
-  // vazia: "Aguardando" significa recurso já protocolado, não sobrescreve.
+  // Abertura da próxima etapa: DP indeferida deixa a JARI como "Não
+  // realizado" (nunca vazia) — com vencimento definido, o workspace joga a
+  // AIT na fila de recursos. Só preenche etapa vazia: "Aguardando" já é
+  // recurso protocolado, não sobrescreve.
+  // Vale só para DP→JARI: o site mostra a JARI de forma confiável, então se
+  // ela for feita o próprio site corrige o "Não realizado".
+  // A 2ª instância NUNCA é aberta automaticamente — o site é cego para ela,
+  // então um "Não realizado" colocado por engano nunca se corrigiria e
+  // viraria defesa fantasma na fila. A 2ª só muda quando o site exibe uma
+  // decisão real (tratada no loop de achados acima).
   if (merged.defesa_previa === 'Indeferido' && !merged.jari) {
     fields.jari = 'Não realizado'
     merged = { ...merged, jari: 'Não realizado' }
-  }
-  if (merged.jari === 'Indeferido' && !merged.segunda_instancia) {
-    fields.segunda_instancia = 'Não realizado'
-    merged = { ...merged, segunda_instancia: 'Não realizado' }
   }
 
   if (!ait.encerrado && deveEncerrar(merged)) fields.encerrado = true
