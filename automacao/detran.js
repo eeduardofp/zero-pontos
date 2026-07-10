@@ -187,8 +187,14 @@ async function irParaInicio(page) {
 }
 
 // Se o site redirecionar para login, espera o usuário logar manualmente.
+// Testa só host+caminho da URL — query string NÃO: o parâmetro
+// "consultarProcessoSuspensao" contém "sso" (Proce-SSO-...) e fazia o
+// robô achar que estava eternamente na tela de login.
 function emTelaDeLogin(page) {
-  return /login|sso|acesso|auth/i.test(page.url()) && !page.url().includes('consulta-dossie')
+  let u
+  try { u = new URL(page.url()) } catch { return false }
+  const alvo = u.hostname + u.pathname
+  return /login|sso|acesso|auth/i.test(alvo) && !alvo.includes('consulta-dossie')
 }
 
 async function garantirLogado(page) {
@@ -343,11 +349,19 @@ async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
   }
   const campoSenha = await acharCampo(/senha/i, '[type="password"]')
 
-  // clica antes de digitar (label flutuante do Material exige foco)
-  await campoProto.click().catch(() => {})
-  await campoProto.fill(protocolo)
-  await campoSenha.click().catch(() => {})
-  await campoSenha.fill(senha)
+  // Digitação tecla a tecla: fill() injeta o valor de uma vez e o formulário
+  // Angular NÃO registra (validado em diagnóstico real 2026-07-10 — com fill o
+  // clique em ACESSAR não disparava nada; com pressSequentially o POST
+  // /transito-api/processo/buscar dispara e a tela DADOS DO PROCESSO abre).
+  const digitar = async (campo, valor) => {
+    await campo.click()
+    await campo.press('Control+a')
+    await campo.press('Delete')
+    await campo.pressSequentially(valor, { delay: 40 })
+    await campo.press('Tab')
+  }
+  await digitar(campoProto, protocolo)
+  await digitar(campoSenha, senha)
   const botao = page.getByRole('button', { name: /ACESSAR|CONSULTAR|ENTRAR|BUSCAR/i }).first()
   await botao.click().catch(() => page.keyboard.press('Enter'))
 
