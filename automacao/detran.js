@@ -362,8 +362,23 @@ async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
   }
   await digitar(campoProto, protocolo)
   await digitar(campoSenha, senha)
-  const botao = page.getByRole('button', { name: /ACESSAR|CONSULTAR|ENTRAR|BUSCAR/i }).first()
-  await botao.click().catch(() => page.keyboard.press('Enter'))
+
+  // O banner de cookies ("...Ok") pode ficar por cima do botão e roubar o
+  // clique — aceita antes, se estiver visível.
+  const okCookies = page.locator('button').filter({ hasText: /^\s*ok\s*$/i }).first()
+  if (await okCookies.isVisible().catch(() => false)) {
+    await okCookies.click().catch(() => {})
+    await page.waitForTimeout(300)
+  }
+
+  // Clique em ACESSAR com 3 camadas: clique normal → clique direto no DOM
+  // (ignora overlay que intercepte o ponteiro) → Enter no campo de senha.
+  const botao = page.getByRole('button', { name: /acessar/i }).first()
+  const clicou = await botao.click({ timeout: 8000 }).then(() => true).catch(() => false)
+  if (!clicou) {
+    const viaDOM = await botao.evaluate(el => { el.click(); return true }).catch(() => false)
+    if (!viaDOM) await campoSenha.press('Enter').catch(() => {})
+  }
 
   const inicio = Date.now()
   while (Date.now() - inicio < 60000) {
