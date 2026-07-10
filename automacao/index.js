@@ -1,5 +1,6 @@
 // ─── CONSULTA DE RECURSOS (CLI) ──────────────────────────────
-// Uso: node index.js [--dry-run] [--so-status | --so-comercial]
+// Uso: node index.js [--dry-run] [--so-status | --so-comercial | --so-suspensoes]
+//                    [--suspensoes]   (liga suspensões de CNH junto com o resto)
 // Interface de reserva; o painel (painel.js) é a principal. Ambos usam rodada.js.
 const readline = require('readline')
 const S = require('./supabase.js')
@@ -10,6 +11,8 @@ const R = require('./relatorio.js')
 const DRY = process.argv.includes('--dry-run')
 const SO_STATUS = process.argv.includes('--so-status')
 const SO_COMERCIAL = process.argv.includes('--so-comercial')
+const SO_SUSPENSOES = process.argv.includes('--so-suspensoes')
+const COM_SUSPENSOES = SO_SUSPENSOES || process.argv.includes('--suspensoes')
 
 function perguntar(msg) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
@@ -77,8 +80,9 @@ async function main() {
   const { arqRelatorio, arqInvalidas } = await Rodada.executar({
     alvoIds: alvo.ids,
     dryRun: DRY,
-    consultarStatus: !SO_COMERCIAL,
-    consultarComercial: !SO_STATUS,
+    consultarStatus: !SO_COMERCIAL && !SO_SUSPENSOES,
+    consultarComercial: !SO_STATUS && !SO_SUSPENSOES,
+    consultarSuspensoes: COM_SUSPENSOES,
     emit: (ev, d) => {
       if (ev === 'inicio') console.log(`${d.total} placa(s) na fila`)
       if (ev === 'placa') console.log(`[${d.n}/${d.total}] ${d.placa}`)

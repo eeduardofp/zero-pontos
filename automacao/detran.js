@@ -288,6 +288,46 @@ async function abrirDossie(page, placa, renavam, opcoes = {}) {
   return { status, texto }
 }
 
+// ─── SUSPENSÕES DE CNH ───────────────────────────────────────
+// Serviço de suspensão: consulta por protocolo+senha, sem placa.
+// Sem fixture ainda — parsing por texto visível (resiliente a markup);
+// desfecho não reconhecido gera screenshot para calibrar depois.
+const URL_SUSPENSAO = 'https://servicos.detran.sc.gov.br/habilitacao?consultarProcessoSuspensao=true'
+
+// → { status: 'ok'|'nao-encontrado'|'limite'|'erro', texto }
+// 'ok' = tela "DADOS DO PROCESSO" visível; texto = innerText da página
+// (o chamador extrai fase/prazo com mapeamentoSuspensoes.parseTelaSuspensao).
+async function consultarSuspensao(page, protocolo, senha) {
+  await page.goto(URL_SUSPENSAO, { waitUntil: 'domcontentloaded' })
+  await garantirLogado(page)
+
+  // Campos do formulário: tenta por atributo (placeholder/name/id), senão
+  // cai nos dois primeiros inputs visíveis (protocolo, senha — nesta ordem).
+  const visiveis = page.locator('input:visible')
+  await visiveis.first().waitFor({ timeout: 30000 })
+  let campoProto = page.locator('input[placeholder*="rotocolo" i], input[name*="rotocolo" i], input[id*="rotocolo" i]').first()
+  let campoSenha = page.locator('input[placeholder*="enha" i], input[name*="enha" i], input[id*="enha" i], input[type="password"]').first()
+  if (await campoProto.count() === 0) campoProto = visiveis.nth(0)
+  if (await campoSenha.count() === 0) campoSenha = visiveis.nth(1)
+  await campoProto.fill(protocolo)
+  await campoSenha.fill(senha)
+  await page.locator('button:visible').filter({ hasText: /CONSULTAR/i }).first().click()
+
+  const inicio = Date.now()
+  while (Date.now() - inicio < 60000) {
+    const corpo = await page.locator('body').innerText().catch(() => '')
+    if (/DADOS DO PROCESSO/i.test(corpo)) return { status: 'ok', texto: corpo }
+    if (/(protocolo|senha)[^.\n]*(inv[áa]lid|incorret|n[ãa]o confere)/i.test(corpo) ||
+        /processo n[ãa]o (encontrado|localizado)/i.test(corpo)) {
+      return { status: 'nao-encontrado', texto: corpo.replace(/\s+/g, ' ').slice(0, 300) }
+    }
+    if (SEL.limiteConsultas.test(corpo)) return { status: 'limite', texto: '' }
+    await page.waitForTimeout(1000)
+  }
+  const texto = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 400)
+  return { status: 'erro', texto }
+}
+
 // Recursos e débitos completos (todas as páginas)
 function todosRecursos(page) {
   return extrairComPaginacao(page, /RECURSOS DE INFRA/i, extractRecursos)
@@ -312,5 +352,5 @@ module.exports = {
   extractRecursos, extractDebitos, extractInfracoes, isPermissaoNegada, isLimiteAtingido, classificarDossie,
   instanciaDoProcesso, SEL,
   abrirBrowser, limparSessao, irParaInicio, garantirLogado, abrirDossie,
-  todosRecursos, todosDebitos, todasInfracoes, screenshotErro
+  todosRecursos, todosDebitos, todasInfracoes, consultarSuspensao, screenshotErro
 }

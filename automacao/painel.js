@@ -72,26 +72,36 @@ async function iniciar(corpo) {
   }
   const consultarStatus = corpo.status !== false
   const consultarComercial = corpo.comercial !== false
-  if (!consultarStatus && !consultarComercial) {
-    throw Object.assign(new Error('Ative pelo menos uma consulta (status ou comercial)'), { code: 400 })
+  const consultarSuspensoes = corpo.suspensoes === true
+  if (!consultarStatus && !consultarComercial && !consultarSuspensoes) {
+    throw Object.assign(new Error('Ative pelo menos uma consulta (status, comercial ou suspensões)'), { code: 400 })
   }
   const d = await dados()
   let alvoIds = null
-  let rotulo = consultarComercial ? 'todas as placas cadastradas' : 'todas as placas com AIT ativa'
+  let alvoClientes = null
+  let rotulo = consultarComercial ? 'todas as placas cadastradas'
+             : consultarStatus ? 'todas as placas com AIT ativa'
+             : 'todas as suspensões ativas'
   if (corpo.modo === 'cliente') {
     const cli = d.clientes.find(c => c.id === corpo.id)
     if (!cli) throw Object.assign(new Error('Cliente inválido'), { code: 400 })
     alvoIds = new Set(d.placas.filter(p => p.clienteId === corpo.id).map(p => p.id))
+    alvoClientes = new Set([corpo.id])
     rotulo = `cliente ${cli.nome}`
   } else if (corpo.modo === 'placa') {
     const pl = d.placas.find(p => p.id === corpo.id)
     if (!pl) throw Object.assign(new Error('Placa inválida'), { code: 400 })
     alvoIds = new Set([pl.id])
+    // suspensão é da pessoa, não do veículo → usa o dono da placa
+    alvoClientes = new Set([pl.clienteId])
     rotulo = `placa ${pl.placa}`
   }
 
-  const escopo = consultarStatus && consultarComercial ? 'status + comercial'
-               : consultarComercial ? 'só garimpo comercial' : 'só status das AITs'
+  const partes = []
+  if (consultarStatus) partes.push('status das AITs')
+  if (consultarComercial) partes.push('garimpo comercial')
+  if (consultarSuspensoes) partes.push('suspensões de CNH')
+  const escopo = partes.join(' + ')
   Object.assign(estado, {
     fase: 'rodando', dryRun: !!corpo.dryRun, rotulo: `${rotulo} · ${escopo}`,
     total: 0, feitas: 0, contadores: {}, ultimas: [], espera: null,
@@ -103,9 +113,11 @@ async function iniciar(corpo) {
   // roda em background; painel acompanha via SSE
   Rodada.executar({
     alvoIds,
+    alvoClientes,
     dryRun: !!corpo.dryRun,
     consultarStatus,
     consultarComercial,
+    consultarSuspensoes,
     emit: (ev, dd) => {
       if (ev === 'inicio') estado.total = dd.total
       if (ev === 'placa') {

@@ -5,6 +5,7 @@
 const S = require('./supabase.js')
 const D = require('./detran.js')
 const M = require('./mapeamento.js')
+const MS = require('./mapeamentoSuspensoes.js')
 const R = require('./relatorio.js')
 const PI = require('./placasInvalidas.js')
 const Bloq = require('./bloqueios.js')
@@ -27,18 +28,21 @@ const fmtBR = iso => {
 
 // opcoes: {
 //   alvoIds: Set<placaId>|null,          // null = todas
+//   alvoClientes: Set<clienteId>|null,   // filtro das suspensões (null = todas)
 //   dryRun: boolean,
 //   consultarStatus: boolean,            // esteira de recursos das AITs (default true)
 //   consultarComercial: boolean,         // garimpo de oportunidades (default true)
+//   consultarSuspensoes: boolean,        // suspensões de CNH (default false, opt-in)
 //   emit: (evento, dados) => void,       // 'inicio'|'placa'|'aviso'|'fim'
 //   aguardarConfirmacao: async (tipo, msg) => void,  // 'login'|'limite'
 //   deveParar: () => boolean             // true => encerra após a placa atual
 // }
 // retorna { resumo, arqRelatorio, itens }
 async function executar(opcoes) {
-  const { alvoIds, dryRun, emit, aguardarConfirmacao, deveParar } = opcoes
+  const { alvoIds, alvoClientes, dryRun, emit, aguardarConfirmacao, deveParar } = opcoes
   const consultarStatus = opcoes.consultarStatus !== false
   const consultarComercial = opcoes.consultarComercial !== false
+  const consultarSuspensoes = opcoes.consultarSuspensoes === true
 
   await S.login()
   const { aits, placas, clientes } = await S.carregarAtivas()
@@ -49,15 +53,22 @@ async function executar(opcoes) {
     if (!porPlaca.has(a.placa_id)) porPlaca.set(a.placa_id, [])
     porPlaca.get(a.placa_id).push(a)
   }
-  // Fila: com garimpo comercial ligado, TODAS as placas cadastradas (multa
-  // nova aparece também em veículo sem AIT ativa); só status → apenas placas
-  // com AIT ativa. Bloqueadas/inválidas caem nos filtros do laço. Placas com
-  // AIT ativa primeiro (prioridade se o limite encerrar a rodada no meio).
-  const fila = placas
+  // Fila de placas: com garimpo comercial ligado, TODAS as placas cadastradas
+  // (multa nova aparece também em veículo sem AIT ativa); só status → apenas
+  // placas com AIT ativa; só suspensões → nenhuma placa. Bloqueadas/inválidas
+  // caem nos filtros do laço. Placas com AIT ativa primeiro (prioridade se o
+  // limite encerrar a rodada no meio).
+  const fila = (consultarStatus || consultarComercial) ? placas
     .map(p => p.id)
     .filter(id => consultarComercial || porPlaca.has(id))
     .filter(id => !alvoIds || alvoIds.has(id))
-    .sort((a, b) => (porPlaca.has(b) ? 1 : 0) - (porPlaca.has(a) ? 1 : 0))
+    .sort((a, b) => (porPlaca.has(b) ? 1 : 0) - (porPlaca.has(a) ? 1 : 0)) : []
+
+  // Fila de suspensões de CNH: por protocolo+senha, filtrada por cliente
+  // quando o alvo é um cliente específico (suspensão não tem placa).
+  const filaSus = consultarSuspensoes
+    ? (await S.carregarSuspensoesAtivas()).filter(s => !alvoClientes || alvoClientes.has(s.cliente_id))
+    : []
 
   // Base do garimpo: tudo que já conhecemos não é oportunidade
   let codigosConhecidos = []
@@ -96,7 +107,8 @@ async function executar(opcoes) {
     return novos
   }
 
-  emit('inicio', { total: fila.length, dryRun })
+  const total = fila.length + filaSus.length
+  emit('inicio', { total, dryRun })
   let n = 0
   let trocasLimite = 0
   let parou = false
@@ -111,13 +123,13 @@ async function executar(opcoes) {
     if (!placa) {
       novos = aitsDaPlaca.map(a => ({ codigo: a.codigo, tipo: 'erro', detalhe: 'placa não encontrada no cadastro' }))
       itens.push(...novos)
-      emit('placa', { n, total: fila.length, placa: '—', novos }); flush(); continue
+      emit('placa', { n, total, placa: '—', novos }); flush(); continue
     }
 
     // placa já sabidamente protegida → pula sem consultar
     if (bloq.estaBloqueada(placaId)) {
       novos = marcarTodas(placa, 'pulado-protegido', 'Bloqueada em rodada anterior — cliente sem autorização')
-      emit('placa', { n, total: fila.length, placa: placa.placa, novos }); flush(); continue
+      emit('placa', { n, total, placa: placa.placa, novos }); flush(); continue
     }
 
     // dados inválidos no cadastro → pula sem consultar, não toca ultima_att
@@ -129,7 +141,7 @@ async function executar(opcoes) {
                   : `placa inválida ("${placa.placa}")`
       novos = marcarTodas(placa, 'dados-invalidos', falta)
       invalidas.push({ cliente: nomeCliente(placa), placa: placa.placa, renavam: placa.renavan, motivo: falta })
-      emit('placa', { n, total: fila.length, placa: placa.placa, novos }); flush(); continue
+      emit('placa', { n, total, placa: placa.placa, novos }); flush(); continue
     }
 
     // cadastro guarda "QJC8G88/SC" e renavam formatado — o site quer limpo
@@ -189,7 +201,76 @@ async function executar(opcoes) {
       }
     }
 
-    emit('placa', { n, total: fila.length, placa: placa.placa, novos })
+    emit('placa', { n, total, placa: placa.placa, novos })
+    flush()
+    if (parou) break
+    await sleep(PAUSA_ENTRE_PLACAS_MS)
+  }
+
+  // ── Suspensões de CNH (protocolo+senha, mesma sessão/limite) ──
+  for (const s of filaSus) {
+    if (parou || deveParar()) { parou = true; break }
+    n++
+    const cli = clientes.find(c => c.id === s.cliente_id)
+    const nome = cli ? cli.nome : '—'
+    const rotulo = s.processo || s.protocolo || s.id
+    let novos = []
+
+    if (!s.protocolo || !s.senha) {
+      novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'dados-invalidos', detalhe: 'protocolo/senha ausentes no cadastro' }]
+      itens.push(...novos)
+      emit('placa', { n, total, placa: rotulo, novos }); flush(); continue
+    }
+
+    let tentativaTecnica = 0
+    let resolvido = false
+    while (!resolvido) {
+      let desfecho
+      try {
+        desfecho = await D.consultarSuspensao(page, s.protocolo, s.senha)
+      } catch (e) {
+        tentativaTecnica++
+        if (tentativaTecnica > 1) {
+          const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
+          novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'erro', detalhe: `${e.message} (screenshot: ${shot})` }]
+          itens.push(...novos)
+          break
+        }
+        continue
+      }
+
+      if (desfecho.status === 'ok') {
+        novos = await processarSuspensao(s, nome, desfecho.texto, dryRun, page, rotulo)
+        itens.push(...novos)
+        resolvido = true
+      } else if (desfecho.status === 'limite') {
+        trocasLimite++
+        if (trocasLimite > MAX_TROCAS_LIMITE) {
+          novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'limite', detalhe: 'Limite persistente — suspensão não consultada nesta rodada' }]
+          itens.push(...novos)
+          parou = true
+          resolvido = true
+        } else {
+          emit('aviso', { tipo: 'limite', msg: `Limite de consultas atingido (troca ${trocasLimite}/${MAX_TROCAS_LIMITE}).` })
+          await ctx.clearCookies().catch(() => {})
+          await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} }).catch(() => {})
+          await D.irParaInicio(page)
+          await aguardarConfirmacao('limite', 'Limite atingido. Faça login com OUTRA conta na janela do Chrome e clique em Continuar.')
+        }
+      } else if (desfecho.status === 'nao-encontrado') {
+        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'dados-invalidos', detalhe: `protocolo/senha não localizados no site: "${desfecho.texto.slice(0, 120)}"` }]
+        itens.push(...novos)
+        invalidas.push({ cliente: nome, placa: `CNH ${rotulo}`, renavam: s.protocolo, motivo: 'protocolo/senha não localizados no site' })
+        resolvido = true
+      } else {
+        const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
+        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'erro', detalhe: `desfecho não reconhecido: "${desfecho.texto.slice(0, 200)}" (screenshot: ${shot})` }]
+        itens.push(...novos)
+        resolvido = true
+      }
+    }
+
+    emit('placa', { n, total, placa: rotulo, novos })
     flush()
     if (parou) break
     await sleep(PAUSA_ENTRE_PLACAS_MS)
@@ -201,6 +282,41 @@ async function executar(opcoes) {
   for (const i of itens) resumo[i.tipo] = (resumo[i.tipo] || 0) + 1
   emit('fim', { resumo, arqRelatorio, arqInvalidas: invalidas.length ? arqInvalidas : null, parou })
   return { resumo, arqRelatorio, arqInvalidas: invalidas.length ? arqInvalidas : null, itens }
+}
+
+// Tela "DADOS DO PROCESSO" já capturada → atualiza a suspensão no workspace.
+// Só fases "AGUARDANDO JULGAMENTO ..." mudam campos; fase desconhecida vira
+// alerta para atualização manual (com screenshot para calibrar o parser).
+const STATUS_LABEL_SUS = s =>
+  `DP:${s.defesa_previa || '—'} | JARI:${s.jari || '—'} | CETRAN:${s.cetran || '—'}`
+
+async function processarSuspensao(s, nomeCliente, texto, dryRun, page, rotulo) {
+  const tela = MS.parseTelaSuspensao(texto)
+  if (!tela) {
+    const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
+    return [{ cliente: nomeCliente, placa: 'CNH', codigo: rotulo, tipo: 'erro', detalhe: `tela de processo não reconhecida (screenshot: ${shot})` }]
+  }
+  if (!tela.fase) {
+    const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
+    return [{ cliente: nomeCliente, placa: 'CNH', codigo: rotulo, tipo: 'nao-encontrado', detalhe: `fase não reconhecida — atualizar manualmente (screenshot: ${shot})` }]
+  }
+
+  const up = MS.montarUpdateSuspensao(s, tela)
+  const ROTULO = { defesa_previa: 'DP', jari: 'JARI', cetran: 'CETRAN', vencimento_jari: 'Venc. JARI', vencimento_cetran: 'Venc. CETRAN' }
+  const mudancas = Object.keys(ROTULO)
+    .filter(k => k in up && String(up[k] == null ? '' : up[k]) !== String(s[k] == null ? '' : s[k]))
+  const alteracao = mudancas.map(k => `${ROTULO[k]}: ${s[k] ? (k.startsWith('venc') ? fmtBR(s[k]) : s[k]) : '—'} → ${k.startsWith('venc') ? fmtBR(up[k]) : up[k]}`).join('; ')
+
+  if (!dryRun) await S.updateSuspensao(s.id, up)
+
+  return [{
+    cliente: nomeCliente, placa: 'CNH', codigo: rotulo,
+    tipo: mudancas.length ? 'atualizado' : 'sem-mudanca',
+    alteracao,
+    antes: STATUS_LABEL_SUS(s), depois: STATUS_LABEL_SUS({ ...s, ...up }),
+    vencimento: up.vencimento_jari || up.vencimento_cetran || '',
+    detalhe: `fase no site: aguardando julgamento ${tela.fase.toUpperCase()}`
+  }]
 }
 
 // Consulta um dossiê já aberto e devolve os itens de relatório das AITs da placa.

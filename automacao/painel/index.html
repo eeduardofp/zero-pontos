@@ -103,7 +103,7 @@
         <div class="sugestoes" id="sugestoes"></div>
       </div>
       <div class="escolhido" id="escolhido"></div>
-      <div class="linha-opcoes" style="justify-content:flex-start;gap:28px">
+      <div class="linha-opcoes" style="justify-content:flex-start;gap:28px;flex-wrap:wrap">
         <label class="chave">
           <input type="checkbox" id="chk-status" checked>
           <span class="trilho"></span>
@@ -113,6 +113,11 @@
           <input type="checkbox" id="chk-comercial" checked>
           <span class="trilho"></span>
           Garimpo comercial (possíveis vendas)
+        </label>
+        <label class="chave">
+          <input type="checkbox" id="chk-suspensoes">
+          <span class="trilho"></span>
+          Suspensões de CNH
         </label>
       </div>
       <div class="linha-opcoes">
@@ -234,15 +239,16 @@ $('campo-busca').oninput = () => {
 
 $('btn-iniciar').onclick = async () => {
   if (modo !== 'todas' && !selecionado) { alert('Escolha um ' + (modo === 'cliente' ? 'cliente' : 'placa') + ' na lista.'); return }
-  if (!$('chk-status').checked && !$('chk-comercial').checked) {
-    alert('Ative pelo menos uma consulta: Status das AITs ou Garimpo comercial.'); return
+  if (!$('chk-status').checked && !$('chk-comercial').checked && !$('chk-suspensoes').checked) {
+    alert('Ative pelo menos uma consulta: Status das AITs, Garimpo comercial ou Suspensões de CNH.'); return
   }
   $('btn-iniciar').disabled = true
   const resp = await fetch('/api/iniciar', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       modo, id: selecionado ? selecionado.id : null, dryRun: $('dry').checked,
-      status: $('chk-status').checked, comercial: $('chk-comercial').checked
+      status: $('chk-status').checked, comercial: $('chk-comercial').checked,
+      suspensoes: $('chk-suspensoes').checked
     })
   })
   if (!resp.ok) {

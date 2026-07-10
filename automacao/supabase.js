@@ -65,4 +65,14 @@ async function criarOportunidade(obj) {
   if (error) throw new Error(`Insert oportunidade ${obj.codigo_ait} falhou: ${error.message}`)
 }
 
-module.exports = { login, carregarAtivas, updateAIT, carregarComercial, criarOportunidade }
+// Suspensões de CNH ativas (encerrado false OU null)
+async function carregarSuspensoesAtivas() {
+  return buscarTudo(client.from('suspensoes').select('*').or('encerrado.is.null,encerrado.eq.false'))
+}
+
+async function updateSuspensao(id, fields) {
+  const { error } = await client.from('suspensoes').update(fields).eq('id', id)
+  if (error) throw new Error(`Update suspensão ${id} falhou: ${error.message}`)
+}
+
+module.exports = { login, carregarAtivas, updateAIT, carregarComercial, criarOportunidade, carregarSuspensoesAtivas, updateSuspensao }
