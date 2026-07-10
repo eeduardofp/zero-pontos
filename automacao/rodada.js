@@ -26,6 +26,11 @@ const fmtBR = iso => {
   return d ? `${d}/${m}/${a}` : iso || '—'
 }
 
+// Chrome da automação morreu (fechado na mão ou perfil roubado por zumbi):
+// não adianta iterar o resto da fila — aborta a rodada com mensagem clara.
+const browserMorreu = e =>
+  /browser has been closed|Target page, context or browser has been closed|browser closed/i.test(e.message || '')
+
 // opcoes: {
 //   alvoIds: Set<placaId>|null,          // null = todas
 //   alvoClientes: Set<clienteId>|null,   // filtro das suspensões (null = todas)
@@ -155,6 +160,7 @@ async function executar(opcoes) {
       try {
         desfecho = await D.abrirDossie(page, placaLimpa, renavamLimpo, { incluirInfracoes: consultarComercial })
       } catch (e) {
+        if (browserMorreu(e)) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
         // erro técnico (navegação/timeout): 1 retry, depois marca erro
         tentativaTecnica++
         if (tentativaTecnica > 1) {
@@ -229,6 +235,7 @@ async function executar(opcoes) {
       try {
         desfecho = await D.consultarSuspensao(page, s.protocolo, s.senha)
       } catch (e) {
+        if (browserMorreu(e)) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
         tentativaTecnica++
         if (tentativaTecnica > 1) {
           const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
@@ -258,13 +265,12 @@ async function executar(opcoes) {
           await aguardarConfirmacao('limite', 'Limite atingido. Faça login com OUTRA conta na janela do Chrome e clique em Continuar.')
         }
       } else if (desfecho.status === 'nao-encontrado') {
-        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'dados-invalidos', detalhe: `protocolo/senha não localizados no site: "${desfecho.texto.slice(0, 120)}"` }]
+        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'dados-invalidos', detalhe: `protocolo/senha não localizados no site${desfecho.dump ? ` (dump: ${desfecho.dump})` : ''}: "${desfecho.texto.slice(0, 120)}"` }]
         itens.push(...novos)
         invalidas.push({ cliente: nome, placa: `CNH ${rotulo}`, renavam: s.protocolo, motivo: 'protocolo/senha não localizados no site' })
         resolvido = true
       } else {
-        const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
-        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'erro', detalhe: `desfecho não reconhecido: "${desfecho.texto.slice(0, 200)}" (screenshot: ${shot})` }]
+        novos = [{ cliente: nome, placa: 'CNH', codigo: rotulo, tipo: 'erro', detalhe: `desfecho não reconhecido${desfecho.dump ? ` (dump: ${desfecho.dump})` : ''}: "${desfecho.texto.slice(0, 200)}"` }]
         itens.push(...novos)
         resolvido = true
       }

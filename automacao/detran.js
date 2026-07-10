@@ -152,8 +152,19 @@ async function isPermissaoNegada(page) {
 
 // Apaga a sessão salva (perfil do Chrome) para forçar login limpo a cada
 // execução. Chamado antes de abrir o browser — permite trocar de conta.
+// Perfil travado = Chrome zumbi de rodada anterior ainda aberto; se o novo
+// Chrome abrir no mesmo perfil ele delega pro zumbi e morre ("browser has
+// been closed") — melhor falhar aqui com mensagem clara.
 function limparSessao() {
-  try { fs.rmSync(PROFILE, { recursive: true, force: true }) } catch {}
+  try {
+    fs.rmSync(PROFILE, { recursive: true, force: true })
+  } catch (e) {
+    throw new Error(
+      'Não consegui limpar o perfil do Chrome da automação — provavelmente ' +
+      'sobrou uma janela do Chrome de uma rodada anterior. Feche TODAS as ' +
+      `janelas do Chrome da automação e tente de novo. (${e.code || e.message})`
+    )
+  }
 }
 
 // Flags anti-detecção: sem elas o captcha do login rejeita solução correta
@@ -294,24 +305,51 @@ async function abrirDossie(page, placa, renavam, opcoes = {}) {
 // desfecho não reconhecido gera screenshot para calibrar depois.
 const URL_SUSPENSAO = 'https://servicos.detran.sc.gov.br/habilitacao?consultarProcessoSuspensao=true'
 
-// → { status: 'ok'|'nao-encontrado'|'limite'|'erro', texto }
+// Despeja o HTML e um screenshot da página no logs/ para calibração.
+// Enquanto não há fixture do site de suspensões, todo desfecho não-ok
+// grava a página real para eu ajustar seletores/parser sem adivinhar.
+async function dumpSuspensao(page, rotulo) {
+  fs.mkdirSync(LOGS, { recursive: true })
+  const nome = String(rotulo).replace(/[^0-9A-Za-z]/g, '')
+  const base = path.join(LOGS, `suspensao-${nome}-${Date.now()}`)
+  try { fs.writeFileSync(`${base}.html`, await page.content()) } catch {}
+  try { await page.screenshot({ path: `${base}.png`, fullPage: true }) } catch {}
+  return `${base}.html`
+}
+
+// → { status: 'ok'|'nao-encontrado'|'limite'|'erro', texto, dump? }
 // 'ok' = tela "DADOS DO PROCESSO" visível; texto = innerText da página
 // (o chamador extrai fase/prazo com mapeamentoSuspensoes.parseTelaSuspensao).
-async function consultarSuspensao(page, protocolo, senha) {
+async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
+  const debug = opcoes.debug !== false   // calibração ligada por padrão (sem fixture)
   await page.goto(URL_SUSPENSAO, { waitUntil: 'domcontentloaded' })
   await garantirLogado(page)
+  await page.waitForLoadState('networkidle').catch(() => {})
 
-  // Campos do formulário: tenta por atributo (placeholder/name/id), senão
-  // cai nos dois primeiros inputs visíveis (protocolo, senha — nesta ordem).
-  const visiveis = page.locator('input:visible')
-  await visiveis.first().waitFor({ timeout: 30000 })
-  let campoProto = page.locator('input[placeholder*="rotocolo" i], input[name*="rotocolo" i], input[id*="rotocolo" i]').first()
-  let campoSenha = page.locator('input[placeholder*="enha" i], input[name*="enha" i], input[id*="enha" i], input[type="password"]').first()
-  if (await campoProto.count() === 0) campoProto = visiveis.nth(0)
-  if (await campoSenha.count() === 0) campoSenha = visiveis.nth(1)
+  // Modal "Acompanhar processo": campos com label flutuante ("Protocolo *",
+  // "Senha de acesso *") e botão "ACESSAR". getByLabel casa label/placeholder;
+  // se falhar, cai nos inputs de texto/senha visíveis do diálogo.
+  const acharCampo = async (reLabel, tipoFallback) => {
+    const porLabel = page.getByLabel(reLabel).first()
+    if (await porLabel.count().catch(() => 0)) return porLabel
+    return page.locator(`input${tipoFallback}:visible`).first()
+  }
+  let campoProto = await acharCampo(/protocolo/i, ':not([type="password"])')
+  const achouCampo = await campoProto.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)
+  if (!achouCampo) {
+    const dump = debug ? await dumpSuspensao(page, `form-${protocolo}`) : null
+    const texto = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 400)
+    return { status: 'erro', texto: `formulário de protocolo não encontrado. ${texto}`, dump }
+  }
+  const campoSenha = await acharCampo(/senha/i, '[type="password"]')
+
+  // clica antes de digitar (label flutuante do Material exige foco)
+  await campoProto.click().catch(() => {})
   await campoProto.fill(protocolo)
+  await campoSenha.click().catch(() => {})
   await campoSenha.fill(senha)
-  await page.locator('button:visible').filter({ hasText: /CONSULTAR/i }).first().click()
+  const botao = page.getByRole('button', { name: /ACESSAR|CONSULTAR|ENTRAR|BUSCAR/i }).first()
+  await botao.click().catch(() => page.keyboard.press('Enter'))
 
   const inicio = Date.now()
   while (Date.now() - inicio < 60000) {
@@ -319,13 +357,15 @@ async function consultarSuspensao(page, protocolo, senha) {
     if (/DADOS DO PROCESSO/i.test(corpo)) return { status: 'ok', texto: corpo }
     if (/(protocolo|senha)[^.\n]*(inv[áa]lid|incorret|n[ãa]o confere)/i.test(corpo) ||
         /processo n[ãa]o (encontrado|localizado)/i.test(corpo)) {
-      return { status: 'nao-encontrado', texto: corpo.replace(/\s+/g, ' ').slice(0, 300) }
+      const dump = debug ? await dumpSuspensao(page, `naoenc-${protocolo}`) : null
+      return { status: 'nao-encontrado', texto: corpo.replace(/\s+/g, ' ').slice(0, 300), dump }
     }
     if (SEL.limiteConsultas.test(corpo)) return { status: 'limite', texto: '' }
     await page.waitForTimeout(1000)
   }
+  const dump = debug ? await dumpSuspensao(page, `timeout-${protocolo}`) : null
   const texto = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 400)
-  return { status: 'erro', texto }
+  return { status: 'erro', texto, dump }
 }
 
 // Recursos e débitos completos (todas as páginas)
