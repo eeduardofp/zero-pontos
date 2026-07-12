@@ -328,9 +328,7 @@ async function dumpSuspensao(page, rotulo) {
 // (o chamador extrai fase/prazo com mapeamentoSuspensoes.parseTelaSuspensao).
 async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
   const debug = opcoes.debug !== false   // calibração ligada por padrão (sem fixture)
-  await page.goto(URL_SUSPENSAO, { waitUntil: 'domcontentloaded' })
-  await garantirLogado(page)
-  await page.waitForLoadState('networkidle').catch(() => {})
+  const log = opcoes.log || (() => {})   // telemetria de micro-passos (diagnóstico)
 
   // Modal "Acompanhar processo": campos com label flutuante ("Protocolo *",
   // "Senha de acesso *") e botão "ACESSAR". getByLabel casa label/placeholder;
@@ -340,9 +338,23 @@ async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
     if (await porLabel.count().catch(() => 0)) return porLabel
     return page.locator(`input${tipoFallback}:visible`).first()
   }
-  let campoProto = await acharCampo(/protocolo/i, ':not([type="password"])')
-  const achouCampo = await campoProto.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)
-  if (!achouCampo) {
+
+  // Logo após o login a sessão ainda pode não ter propagado para a rota
+  // /habilitacao — o site recarrega e devolve a HOME DESLOGADA (sem modal).
+  // Visto ao vivo em 2026-07-10: dump mostrou "Bem-vindo(a)... Acessar via
+  // GOV.BR" e zero inputs. Corrida de timing → entra com até 4 tentativas.
+  let campoProto = null
+  for (let tentativa = 0; tentativa < 4 && !campoProto; tentativa++) {
+    if (tentativa > 0) await page.waitForTimeout(3000)
+    await page.goto(URL_SUSPENSAO, { waitUntil: 'domcontentloaded' })
+    await garantirLogado(page)
+    await page.waitForLoadState('networkidle').catch(() => {})
+    const cand = await acharCampo(/protocolo/i, ':not([type="password"])')
+    const visivel = await cand.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false)
+    log(`campo protocolo tentativa ${tentativa + 1}: visível=${visivel}`)
+    if (visivel) campoProto = cand
+  }
+  if (!campoProto) {
     const dump = debug ? await dumpSuspensao(page, `form-${protocolo}`) : null
     const texto = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 400)
     return { status: 'erro', texto: `formulário de protocolo não encontrado. ${texto}`, dump }
@@ -362,25 +374,34 @@ async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
   }
   await digitar(campoProto, protocolo)
   await digitar(campoSenha, senha)
+  log(`digitado: protocolo(${protocolo.length} chars) e senha(${senha.length} chars)`)
 
-  // O banner de cookies ("...Ok") pode ficar por cima do botão e roubar o
-  // clique — aceita antes, se estiver visível.
-  const okCookies = page.locator('button').filter({ hasText: /^\s*ok\s*$/i }).first()
-  if (await okCookies.isVisible().catch(() => false)) {
-    await okCookies.click().catch(() => {})
-    await page.waitForTimeout(300)
-  }
+  // NÃO clicar no banner de cookies: medido ao vivo (2026-07-10), o clique
+  // "de proteção" no Ok era o que QUEBRAVA o ACESSAR (com o banner intacto a
+  // consulta funciona; após o force-click no Ok o botão fica inclicável).
+
+  // valores realmente registrados nos inputs (o que o Angular vê)
+  const valores = await page.locator('input:visible').evaluateAll(els =>
+    els.map(el => ({ id: el.id, len: (el.value || '').length }))).catch(() => [])
+  log(`inputs visíveis pós-digitação: ${JSON.stringify(valores)}`)
 
   // Clique em ACESSAR com 3 camadas: clique normal → clique direto no DOM
   // (ignora overlay que intercepte o ponteiro) → Enter no campo de senha.
   const botao = page.getByRole('button', { name: /acessar/i }).first()
-  const clicou = await botao.click({ timeout: 8000 }).then(() => true).catch(() => false)
+  log(`botão ACESSAR: count=${await botao.count().catch(() => '?')} enabled=${await botao.isEnabled().catch(() => '?')}`)
+  const clicou = await botao.click({ timeout: 8000 }).then(() => true).catch(e => { log(`clique normal falhou: ${String(e.message).split('\n')[0]}`); return false })
+  log(`clique normal: ${clicou}`)
   if (!clicou) {
     const viaDOM = await botao.evaluate(el => { el.click(); return true }).catch(() => false)
-    if (!viaDOM) await campoSenha.press('Enter').catch(() => {})
+    log(`clique via DOM: ${viaDOM}`)
+    if (!viaDOM) { await campoSenha.press('Enter').catch(() => {}); log('fallback: Enter na senha') }
   }
 
+  // Espera o desfecho; se em 15s nada mudou, re-clica ACESSAR (o handler do
+  // Angular às vezes ainda não está ligado no primeiro clique) — até 3 cliques.
   const inicio = Date.now()
+  let ultimoClique = Date.now()
+  let cliques = 1
   while (Date.now() - inicio < 60000) {
     const corpo = await page.locator('body').innerText().catch(() => '')
     if (/DADOS DO PROCESSO/i.test(corpo)) return { status: 'ok', texto: corpo }
@@ -390,6 +411,12 @@ async function consultarSuspensao(page, protocolo, senha, opcoes = {}) {
       return { status: 'nao-encontrado', texto: corpo.replace(/\s+/g, ' ').slice(0, 300), dump }
     }
     if (SEL.limiteConsultas.test(corpo)) return { status: 'limite', texto: '' }
+    if (Date.now() - ultimoClique > 15000 && cliques < 3) {
+      cliques++
+      log(`sem desfecho em 15s — re-clicando ACESSAR (clique ${cliques}/3)`)
+      await botao.click({ timeout: 3000 }).catch(() => botao.evaluate(el => el.click()).catch(() => {}))
+      ultimoClique = Date.now()
+    }
     await page.waitForTimeout(1000)
   }
   const dump = debug ? await dumpSuspensao(page, `timeout-${protocolo}`) : null

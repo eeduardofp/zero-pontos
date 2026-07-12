@@ -88,9 +88,21 @@ async function executar(opcoes) {
   // Login obrigatório e limpo a cada execução: apaga a sessão anterior
   // para o usuário poder entrar com a conta que quiser.
   D.limparSessao()
-  const { ctx, page } = await D.abrirBrowser()
+  const { ctx, page: pagInicial } = await D.abrirBrowser()
+  let page = pagInicial
+
+  // O login via GOV.BR pode FECHAR a aba original e abrir outra — visto ao
+  // vivo em 2026-07-10 ("Target page has been closed" logo após o login).
+  // Antes de qualquer uso, garante uma aba viva do mesmo Chrome.
+  const paginaViva = async () => {
+    if (!page.isClosed()) return page
+    page = ctx.pages().find(p => !p.isClosed()) || await ctx.newPage()
+    return page
+  }
+
   await D.irParaInicio(page)
   await aguardarConfirmacao('login', 'Faça login no Detran Digital na janela do Chrome e clique em Continuar.')
+  await paginaViva()
 
   const itens = []
   const arqRelatorio = R.novoCaminho()   // caminho fixo — regravado a cada placa
@@ -158,9 +170,14 @@ async function executar(opcoes) {
     while (!resolvido) {
       let desfecho
       try {
+        await paginaViva()
         desfecho = await D.abrirDossie(page, placaLimpa, renavamLimpo, { incluirInfracoes: consultarComercial })
       } catch (e) {
-        if (browserMorreu(e)) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
+        if (browserMorreu(e)) {
+          // aba morreu (login GOV.BR fecha a aba original) → readquire e retenta
+          const ok = await paginaViva().then(() => true).catch(() => false)
+          if (!ok) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
+        }
         // erro técnico (navegação/timeout): 1 retry, depois marca erro
         tentativaTecnica++
         if (tentativaTecnica > 1) {
@@ -233,9 +250,13 @@ async function executar(opcoes) {
     while (!resolvido) {
       let desfecho
       try {
+        await paginaViva()
         desfecho = await D.consultarSuspensao(page, s.protocolo, s.senha)
       } catch (e) {
-        if (browserMorreu(e)) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
+        if (browserMorreu(e)) {
+          const ok = await paginaViva().then(() => true).catch(() => false)
+          if (!ok) throw new Error('O Chrome da automação foi fechado no meio da rodada. Feche janelas restantes e rode de novo.')
+        }
         tentativaTecnica++
         if (tentativaTecnica > 1) {
           const shot = await D.screenshotErro(page, `suspensao-${rotulo}`)
