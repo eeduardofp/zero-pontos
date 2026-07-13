@@ -330,26 +330,55 @@ function renderKanban() {
 }
 
 // ── RECURSOS ──────────────────────────────────────────────────
-function renderRecursos() {
-  const list = Data.getAITs().filter(Data.precisaRecurso)
-    .sort((a, b) => {
-      const ua = Data.urgLabel(a.vencimento).o, ub = Data.urgLabel(b.vencimento).o
-      if (ua !== ub) return ua - ub
-      return (Data.daysUntil(a.vencimento) || 9999) - (Data.daysUntil(b.vencimento) || 9999)
-    })
-  const body = document.getElementById('recursos-body')
-  body.innerHTML = list.length ? list.map(a => {
+async function renderRecursos() {
+  // Suspensões é uma página separada — se o usuário nunca abriu "Suspensões"
+  // o cache dela está vazio. Garante que está carregado antes de montar a fila.
+  await Suspensoes.garantirCarregado()
+
+  const aitItens = Data.getAITs().filter(Data.precisaRecurso).map(a => {
     const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
-    const prox = Data.proximaEtapa(a), u = Data.urgLabel(a.vencimento)
+    return {
+      tipo: 'ait', id: a.id,
+      cliente: cl ? cl.nome : '—',
+      identificador: (pl ? pl.placa : '—') + '<br><span style="color:var(--text3)">' + (pl ? pl.renavan : '—') + '</span>',
+      codigo: a.codigo, enquadramento: a.enquadramento || '—',
+      prox: Data.proximaEtapa(a), prazo: a.vencimento
+    }
+  })
+
+  const susItens = Suspensoes.getLista().filter(Suspensoes.precisaRecurso).map(s => {
+    const cl = Data.gCliente(s.cliente_id)
+    const prox = Suspensoes.proximaEtapa(s)
+    return {
+      tipo: 'suspensao', id: s.id,
+      cliente: cl ? cl.nome : '—',
+      identificador: 'Processo ' + (s.processo || '—'),
+      codigo: s.processo || '—', enquadramento: 'Suspensão do direito de dirigir',
+      prox, prazo: prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
+    }
+  })
+
+  const porUrgencia = (x, y) => (Data.daysUntil(x.prazo) ?? 9999) - (Data.daysUntil(y.prazo) ?? 9999)
+  // Suspensão sempre antes de AIT — consequência maior pro cliente.
+  const list = [...susItens.sort(porUrgencia), ...aitItens.sort(porUrgencia)]
+
+  const body = document.getElementById('recursos-body')
+  body.innerHTML = list.length ? list.map(item => {
+    const u = Data.urgLabel(item.prazo)
+    const tag = item.tipo === 'suspensao' ? '<span class="badge b-no" style="margin-right:6px">⚠ CNH</span>' : ''
+    const acao = item.tipo === 'suspensao' ? `openRecursoSus('${item.id}')` : `openRecurso('${item.id}')`
+    const codigoAtributos = item.tipo === 'ait'
+      ? ` style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="openAIT('${item.id}')"`
+      : ` style="font-family:var(--mono);font-size:11px"`
     return `<tr>
-      <td class="bold">${cl ? cl.nome.split(' ').slice(0, 2).join(' ') : '—'}</td>
-      <td style="font-family:var(--mono);font-size:11px">${pl ? pl.placa : '—'}<br><span style="color:var(--text3)">${pl ? pl.renavan : '—'}</span></td>
-      <td style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="openAIT('${a.id}')">${a.codigo.slice(0, 28)}</td>
-      <td style="font-size:12px;color:var(--text3)">${(a.enquadramento || '—').slice(0, 22)}</td>
-      <td><span class="badge b-blue">${prox}</span></td>
-      <td style="font-family:var(--mono);font-size:12px">${a.vencimento || '—'}</td>
+      <td class="bold">${tag}${item.cliente.split(' ').slice(0, 2).join(' ')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${item.identificador}</td>
+      <td${codigoAtributos}>${item.codigo.slice(0, 28)}</td>
+      <td style="font-size:12px;color:var(--text3)">${item.enquadramento.slice(0, 22)}</td>
+      <td><span class="badge b-blue">${item.prox}</span></td>
+      <td style="font-family:var(--mono);font-size:12px">${item.prazo || '—'}</td>
       <td><span class="badge ${u.c}">${u.t}</span></td>
-      <td><button class="btn btn-primary btn-sm" onclick="openRecurso('${a.id}')">Protocolar</button></td></tr>`
+      <td><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button></td></tr>`
   }).join('') : '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3)">Nenhum recurso pendente</td></tr>'
 }
 
@@ -911,6 +940,28 @@ async function confirmarRecurso(aid, etKey) {
     renderRecursos()
     UI.notif('Recurso protocolado — AIT voltou para verificação!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+}
+
+function openRecursoSus(sid) {
+  const s = Suspensoes.getById(sid); if (!s) return
+  const cl = Data.gCliente(s.cliente_id)
+  const prox = Suspensoes.proximaEtapa(s), ant = prox === 'JARI' ? 'Defesa Prévia' : 'JARI'
+  const etKey = prox === 'JARI' ? 'jari' : 'cetran'
+  UI.openModal(
+    `<div class="modal-title">Protocolar recurso — Suspensão de CNH</div>
+    <div class="modal-sub">${cl ? cl.nome : '—'} · Processo ${s.processo || '—'}</div>
+    <div class="field-grid" style="margin:14px 0">
+      <div class="field"><div class="field-label">${ant} (anterior)</div><div class="field-val" style="color:var(--red)">Indeferido</div></div>
+      <div class="field"><div class="field-label">Recurso a fazer</div><div class="field-val" style="color:var(--blue);font-weight:500">${prox}</div></div>
+      ${s.protocolo ? `<div class="field"><div class="field-label">Protocolo</div><div class="field-val mono">${s.protocolo}</div></div>` : ''}
+      ${s.senha ? `<div class="field"><div class="field-label">Senha</div><div class="field-val mono">${s.senha}</div></div>` : ''}
+    </div>
+    <div class="info-box blue" style="margin-bottom:14px">Ao confirmar, <strong>${prox}</strong> será marcado como <strong>Aguardando</strong> e o prazo atual será limpo.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="Suspensoes.confirmarRecurso('${sid}','${etKey}')">✓ Recurso protocolado</button>
+      <button class="btn btn-ghost" onclick="UI.closeModal()">Cancelar</button>
+    </div>`
+  )
 }
 
 // ─── EXCLUSÕES ───────────────────────────────────────────────
