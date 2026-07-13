@@ -367,9 +367,8 @@ async function renderRecursos() {
     const u = Data.urgLabel(item.prazo)
     const tag = item.tipo === 'suspensao' ? '<span class="badge b-no" style="margin-right:6px">⚠ CNH</span>' : ''
     const acao = item.tipo === 'suspensao' ? `openRecursoSus('${item.id}')` : `openRecurso('${item.id}')`
-    const codigoAtributos = item.tipo === 'ait'
-      ? ` style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="openAIT('${item.id}')"`
-      : ` style="font-family:var(--mono);font-size:11px"`
+    const abreContexto = item.tipo === 'suspensao' ? `Suspensoes.abrirDetalhe('${item.id}')` : `openAIT('${item.id}')`
+    const codigoAtributos = ` style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="${abreContexto}"`
     return `<tr>
       <td class="bold">${tag}${item.cliente.split(' ').slice(0, 2).join(' ')}</td>
       <td style="font-family:var(--mono);font-size:11px">${item.identificador}</td>
