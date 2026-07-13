@@ -39,6 +39,8 @@ Isso já é simétrico com o que a automação faz: quando o site mostra uma eta
 
 `suspensoes.js` ganha duas funções espelhando `data.js`:
 
+Só entra na fila com etapa indeferida **e** prazo conhecido (`vencimento_jari`/`vencimento_cetran` preenchido) — indeferida sem prazo ainda (automação não trouxe a data do site) fica de fora, evita lista poluída com pendência sem data real.
+
 ```js
 function precisaRecurso(s) {
   if (s.encerrado) return false
@@ -46,7 +48,9 @@ function precisaRecurso(s) {
   const jariVaz = !s.jari || s.jari === 'Não realizado'
   const jariInd = s.jari === 'Indeferido'
   const cetranVaz = !s.cetran || s.cetran === 'Não realizado'
-  return (defInd && jariVaz) || (jariInd && cetranVaz)
+  if (defInd && jariVaz) return !!s.vencimento_jari
+  if (jariInd && cetranVaz) return !!s.vencimento_cetran
+  return false
 }
 
 function proximaEtapa(s) {
