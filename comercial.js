@@ -269,6 +269,9 @@ const Comercial = (() => {
           <button class="btn btn-ghost"   onclick="Comercial.abrirEditar('${id}')">✎ Editar</button>
         </div>
       ` : `<div style="color:var(--text3);font-size:13px">Esta oportunidade foi ${o.status === 'Convertida' ? 'convertida' : 'marcada como perdida'} em ${Data.fmtData(o.data_fechamento)}.</div>`}
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <button class="btn btn-danger btn-sm" onclick="Comercial.excluirOportunidade('${id}')">🗑 Excluir oportunidade</button>
+      </div>
     `)
   }
 
@@ -521,6 +524,18 @@ const Comercial = (() => {
     } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
+  async function excluirOportunidade(id) {
+    if (!confirm('Excluir esta oportunidade? Esta ação não pode ser desfeita.')) return
+    try {
+      const { error } = await db().from('oportunidades').delete().eq('id', id)
+      if (error) throw error
+      ops = ops.filter(o => o.id !== id)
+      UI.closeModal()
+      await render()
+      UI.notif('Oportunidade excluída!')
+    } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+  }
+
   // ── AUTOCOMPLETE ──────────────────────────────────────────
   function acSelecionar(c) {
     const q   = document.getElementById('op-cliente-q');   if (q)   q.value   = c.nome
@@ -555,7 +570,7 @@ const Comercial = (() => {
     abrirNovaOportunidade, abrirDetalhe,
     abrirConverter, abrirPerder, abrirEditar,
     salvarOportunidade, salvarEdicao, moverStatus,
-    confirmarConverter, confirmarPerda,
+    confirmarConverter, confirmarPerda, excluirOportunidade,
     acFiltrar, acFechar
   }
 })()
