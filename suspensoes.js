@@ -318,6 +318,8 @@ const Suspensoes = (() => {
       '<div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">' + (s.observacao || '—') + '</div></div>',
       '</div>',
 
+      '<div class="section-title" style="margin-bottom:8px">Documentos</div>',
+      '<div id="docs-box-sus" style="margin-bottom:16px"></div>',
       '<div class="section-title" style="margin-bottom:10px">Editar</div>',
       '<div class="form-row" style="margin-bottom:8px">',
       '<div><label class="form-label">Processo</label><input class="form-ctrl" id="sus-ed-proc" value="' + (s.processo || '') + '" style="font-size:12px"></div>',
@@ -342,6 +344,7 @@ const Suspensoes = (() => {
 
     UI.openModal(html)
     document.getElementById('sus-save-btn').onclick = function() { salvarEdicao(id) }
+    Documentos.render('docs-box-sus', { suspensao_id: id })
   }
 
   async function salvarEdicao(id) {

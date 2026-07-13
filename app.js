@@ -652,6 +652,8 @@ function openCliente(cid) {
     '</div>' +
     '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
     contatoHTML + fatHTML +
+    '<div style="margin-top:14px"><div class="section-title">Documentos do titular</div>' +
+    '<div id="docs-box-cli" style="margin-bottom:14px"></div></div>' +
     '<div style="margin-top:14px"><div class="section-title">Placas e AITs</div>' +
     (placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>') + '</div>'
   )
@@ -661,6 +663,7 @@ function openCliente(cid) {
   if (relBtn) relBtn.onclick = function() { gerarRelatorioCliente(cid) }
   const delCliBtn = document.getElementById('cl-del-btn')
   if (delCliBtn) delCliBtn.onclick = function() { excluirCliente(cid) }
+  Documentos.render('docs-box-cli', { cliente_id: cid })
 }
 
 function editarCliente(cid) {
@@ -784,6 +787,8 @@ function openAIT(aid) {
       '<div class="field"><div class="field-label">Valor do serviço</div><div class="field-val" style="color:var(--green)">' + (a.valor ? Data.fmtMoeda(a.valor) : '—') + '</div></div>' +
       '<div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">' + (a.observacao || '—') + '</div></div>' +
     '</div>' +
+    '<div class="section-title" style="margin-bottom:8px">Documentos</div>' +
+    '<div id="docs-box" style="margin-bottom:16px"></div>' +
     '<div class="section-title" style="margin-bottom:10px">Editar</div>' +
     '<div class="form-row" style="margin-bottom:8px">' +
       '<div><label class="form-label">Código da AIT</label><input class="form-ctrl" id="ed-codigo" value="' + (a.codigo || '') + '" style="font-size:12px"></div>' +
@@ -813,6 +818,7 @@ function openAIT(aid) {
   if (aitSaveBtn) aitSaveBtn.onclick = function() { salvarEdicaoAIT(aid) }
   const aitDelBtn = document.getElementById('ait-del-btn')
   if (aitDelBtn) aitDelBtn.onclick = function() { excluirAIT(aid) }
+  Documentos.render('docs-box', { ait_id: aid })
 }
 
 async function salvarEdicaoAIT(aid) {
