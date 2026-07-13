@@ -541,13 +541,18 @@ async function salvarCliente() {
     email: document.getElementById('f-email').value.trim(),
     cpf: document.getElementById('f-cpf').value.trim(),
     nascimento: document.getElementById('f-nascimento').value || null,
+    cnh:      document.getElementById('f-cnh').value.trim(),
+    rg:       document.getElementById('f-rg').value.trim(),
+    endereco: document.getElementById('f-endereco').value.trim(),
+    cep:      document.getElementById('f-cep').value.trim(),
+    primario: document.getElementById('f-primario').value === '' ? null : document.getElementById('f-primario').value === 'sim',
     cadastro: Data.today()
   }
   try {
     const saved = await API.createCliente(obj)
     Data.addCliente(saved)
     UI.updateStats()
-    ;['f-nome', 'f-contato', 'f-email', 'f-cpf', 'f-nascimento'].forEach(id => document.getElementById(id).value = '')
+    ;['f-nome', 'f-contato', 'f-email', 'f-cpf', 'f-nascimento', 'f-cnh', 'f-rg', 'f-endereco', 'f-cep', 'f-primario'].forEach(id => document.getElementById(id).value = '')
     UI.notif('Cliente cadastrado!')
   } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
 }
@@ -639,6 +644,8 @@ function openCliente(cid) {
   let contatoHTML = ''
   if (c.contato) contatoHTML += `<div style="margin-bottom:4px;font-size:13px">Contato: <span style="font-family:var(--mono)">${c.contato}</span></div>`
   if (c.email)   contatoHTML += `<div style="margin-bottom:4px;font-size:13px">E-mail: <a href="mailto:${c.email}" style="color:var(--blue);font-family:var(--mono)">${c.email}</a></div>`
+  if (c.cnh)      contatoHTML += '<div style="margin-bottom:4px;font-size:13px">CNH: <span style="font-family:var(--mono)">' + c.cnh + '</span></div>'
+  if (c.endereco) contatoHTML += '<div style="margin-bottom:4px;font-size:13px">Endereço: ' + c.endereco + (c.cep ? ' · CEP ' + c.cep : '') + '</div>'
   const fatHTML = fat > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Total: <span style="color:var(--green);font-family:var(--mono)">${Data.fmtMoeda(fat)}</span></div>` : ''
 
   UI.openModal(
@@ -684,6 +691,21 @@ function editarCliente(cid) {
     '<div><label class="form-label">CPF</label><input class="form-ctrl" id="ec-cpf" value="' + (c.cpf || '') + '" placeholder="000.000.000-00"></div>',
     '<div><label class="form-label">Data de nascimento</label><input class="form-ctrl" id="ec-nascimento" type="date" value="' + (c.nascimento || '') + '"></div>',
     '</div>',
+    '<div class="form-row" style="margin-bottom:14px">',
+    '<div><label class="form-label">CNH</label><input class="form-ctrl" id="ec-cnh" value="' + (c.cnh || '') + '"></div>',
+    '<div><label class="form-label">RG</label><input class="form-ctrl" id="ec-rg" value="' + (c.rg || '') + '"></div>',
+    '</div>',
+    '<div class="form-group">',
+    '<label class="form-label">Endereço</label>',
+    '<input class="form-ctrl" id="ec-endereco" value="' + (c.endereco || '') + '" placeholder="Rua, nº, bairro, Cidade/UF"></div>',
+    '<div class="form-row" style="margin-bottom:14px">',
+    '<div><label class="form-label">CEP</label><input class="form-ctrl" id="ec-cep" value="' + (c.cep || '') + '"></div>',
+    '<div><label class="form-label">Primário (12m sem infração)</label><select class="form-ctrl" id="ec-primario">' +
+      '<option value="" ' + (c.primario === null || c.primario === undefined ? 'selected' : '') + '>—</option>' +
+      '<option value="sim" ' + (c.primario === true ? 'selected' : '') + '>Sim</option>' +
+      '<option value="nao" ' + (c.primario === false ? 'selected' : '') + '>Não</option>' +
+    '</select></div>',
+    '</div>',
     '<div style="display:flex;gap:8px">',
     '<button class="btn btn-primary" id="ec-save">Salvar</button>',
     '<button class="btn btn-ghost" id="ec-cancel">Cancelar</button>',
@@ -701,7 +723,12 @@ async function salvarEdicaoCliente(cid) {
     contato:    document.getElementById('ec-contato').value.trim(),
     email:      document.getElementById('ec-email').value.trim(),
     cpf:        document.getElementById('ec-cpf').value.trim(),
-    nascimento: document.getElementById('ec-nascimento').value || null
+    nascimento: document.getElementById('ec-nascimento').value || null,
+    cnh:        document.getElementById('ec-cnh').value.trim(),
+    rg:         document.getElementById('ec-rg').value.trim(),
+    endereco:   document.getElementById('ec-endereco').value.trim(),
+    cep:        document.getElementById('ec-cep').value.trim(),
+    primario:   document.getElementById('ec-primario').value === '' ? null : document.getElementById('ec-primario').value === 'sim'
   }
   try {
     await Auth.getClient().from('clientes').update(fields).eq('id', cid)
