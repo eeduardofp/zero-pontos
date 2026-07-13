@@ -887,10 +887,10 @@ function openRecurso(aid) {
       ${a.protocolo ? `<div class="field"><div class="field-label">Protocolo</div><div class="field-val mono">${a.protocolo}</div></div>` : ''}
       ${a.senha ? `<div class="field"><div class="field-label">Senha</div><div class="field-val mono">${a.senha}</div></div>` : ''}
     </div>
-    <div class="info-box blue" style="margin-bottom:14px">Ao confirmar, <strong>${prox}</strong> será marcado como <strong>Aguardando</strong> e a AIT voltará para a fila de verificação.</div>
-    <div class="form-row" style="margin-bottom:14px">
-      <div><label class="form-label">Novo prazo</label><input type="date" class="form-ctrl" id="rv-venc" value="${a.vencimento || ''}" style="font-size:12px"></div>
-      <div><label class="form-label">Observação</label><input class="form-ctrl" id="rv-obs" value="${a.observacao || ''}" style="font-size:12px"></div>
+    <div class="info-box blue" style="margin-bottom:14px">Ao confirmar, <strong>${prox}</strong> será marcado como <strong>Aguardando</strong> e o prazo atual será limpo.</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Observação</label>
+      <input class="form-ctrl" id="rv-obs" value="${a.observacao || ''}" style="font-size:12px">
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" onclick="confirmarRecurso('${aid}','${etKey}')">✓ Recurso protocolado</button>
@@ -901,9 +901,8 @@ function openRecurso(aid) {
 
 async function confirmarRecurso(aid, etKey) {
   const a = Data.gAIT(aid); if (!a) return
-  const fields = { [etKey]: 'Aguardando', ultima_att: Data.today() }
-  const venc = document.getElementById('rv-venc'); if (venc && venc.value) fields.vencimento = venc.value
-  const obs  = document.getElementById('rv-obs');  if (obs) fields.observacao = obs.value
+  const fields = { [etKey]: 'Aguardando', vencimento: null, ultima_att: Data.today() }
+  const obs = document.getElementById('rv-obs'); if (obs) fields.observacao = obs.value
   try {
     await API.updateAIT(aid, fields)
     Data.updateAITCache(aid, fields)
