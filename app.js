@@ -643,10 +643,13 @@ function openCliente(cid) {
   const fatHTML = fat > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Total: <span style="color:var(--green);font-family:var(--mono)">${Data.fmtMoeda(fat)}</span></div>` : ''
 
   UI.openModal(
-    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px;gap:6px;flex-wrap:wrap">' +
     '<div class="modal-title">' + c.nome + '</div>' +
+    '<div style="display:flex;gap:6px">' +
     '<button class="btn btn-ghost btn-sm" id="cl-edit-btn">✎ Editar</button>' +
+    '<button class="btn btn-ghost btn-sm" id="cl-rel-btn">📄 Relatório</button>' +
     '<button class="btn btn-danger btn-sm" id="cl-del-btn">Excluir</button>' +
+    '</div>' +
     '</div>' +
     '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
     contatoHTML + fatHTML +
@@ -655,6 +658,8 @@ function openCliente(cid) {
   )
   const editBtn = document.getElementById('cl-edit-btn')
   if (editBtn) editBtn.onclick = function() { editarCliente(cid) }
+  const relBtn = document.getElementById('cl-rel-btn')
+  if (relBtn) relBtn.onclick = function() { gerarRelatorioCliente(cid) }
   const delCliBtn = document.getElementById('cl-del-btn')
   if (delCliBtn) delCliBtn.onclick = function() { excluirCliente(cid) }
 }
@@ -1103,6 +1108,77 @@ function exportarSuspensoes() {
       downloadExcel(rows, 'Suspensoes_ZeroPontos_' + Data.today() + '.xlsx')
       UI.notif('Exportando ' + data.length + ' suspensões...')
     })
+}
+
+function oQueFazer(precisa, prox, prazo) {
+  if (!precisa) return 'Aguardando decisão — nenhuma ação necessária no momento'
+  return prazo
+    ? `⚠ Protocolar recurso na ${prox} até ${Data.fmtData(prazo)}`
+    : `⚠ Protocolar recurso na ${prox} — prazo a definir`
+}
+
+async function gerarRelatorioCliente(cid) {
+  const c = Data.gCliente(cid); if (!c) return
+  await Suspensoes.garantirCarregado()
+
+  const aitsAll = Data.aitsDe(cid)
+  const ativas = aitsAll.filter(a => !a.encerrado)
+  const encerradas = aitsAll.filter(a => a.encerrado)
+  const deferidas = encerradas.filter(a => Data.statusAtual(a) === 'Deferido').length
+  const indeferidas = encerradas.filter(a => Data.statusAtual(a) === 'Indeferido').length
+  const susAtivas = Suspensoes.getLista().filter(s => s.cliente_id === cid && !s.encerrado)
+
+  const rows = []
+  rows.push(['Relatório — ' + c.nome])
+  rows.push(['Gerado em: ' + Data.fmtData(Data.today())])
+
+  if (!ativas.length && !encerradas.length && !susAtivas.length) {
+    rows.push([])
+    rows.push(['Nenhuma AIT ou suspensão vinculada a este cliente.'])
+  } else {
+    rows.push([])
+    rows.push(['AITs em andamento'])
+    rows.push(['Código', 'Enquadramento', 'Placa', 'Etapa atual', 'Status', 'Prazo', 'O que fazer'])
+    if (ativas.length) {
+      ativas.forEach(a => {
+        const pl = Data.gPlaca(a.placa_id)
+        rows.push([
+          a.codigo, a.enquadramento || '—', pl ? pl.placa : '—',
+          Data.etapaAtual(a), Data.statusAtual(a), a.vencimento ? Data.fmtData(a.vencimento) : '—',
+          oQueFazer(Data.precisaRecurso(a), Data.proximaEtapa(a), a.vencimento)
+        ])
+      })
+    } else {
+      rows.push(['Nenhuma AIT em andamento no momento.'])
+    }
+
+    rows.push([])
+    rows.push(['Resumo de AITs encerradas'])
+    rows.push(['Resultado', 'Quantidade'])
+    rows.push(['Deferidas', deferidas])
+    rows.push(['Indeferidas', indeferidas])
+
+    if (susAtivas.length) {
+      rows.push([])
+      rows.push(['Suspensão de CNH'])
+      rows.push(['Processo', 'Etapa atual', 'Status', 'Prazo', 'O que fazer'])
+      susAtivas.forEach(s => {
+        const prox = Suspensoes.proximaEtapa(s)
+        const prazo = prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
+        rows.push([
+          s.processo || '—', Suspensoes.etapaAtual(s), Suspensoes.statusAtual(s),
+          prazo ? Data.fmtData(prazo) : '—',
+          oQueFazer(Suspensoes.precisaRecurso(s), prox, prazo)
+        ])
+      })
+    }
+  }
+
+  const nomeArquivo = 'Relatorio_' +
+    c.nome.replace(/[\\/:*?"<>|]/g, '').trim().replace(/\s+/g, '_') +
+    '_' + Data.today() + '.xlsx'
+  downloadExcel(rows, nomeArquivo)
+  UI.notif('Relatório de ' + c.nome + ' gerado!')
 }
 
 function calcEtapaSus(s) {
