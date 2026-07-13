@@ -78,6 +78,34 @@ const Suspensoes = (() => {
            s.cetran === 'Deferido' || s.cetran === 'Indeferido' || s.cetran === 'Encerrado'
   }
 
+  // Só entra como pendência quando a etapa anterior está indeferida E o prazo
+  // da próxima etapa é conhecido (senão a automação ainda não trouxe a data
+  // do site — não faz sentido cobrar protocolo sem prazo real).
+  function precisaRecurso(s) {
+    if (s.encerrado) return false
+    const defInd = s.defesa_previa === 'Indeferido'
+    const jariVaz = !s.jari || s.jari === 'Não realizado'
+    const jariInd = s.jari === 'Indeferido'
+    const cetranVaz = !s.cetran || s.cetran === 'Não realizado'
+    if (defInd && jariVaz) return !!s.vencimento_jari
+    if (jariInd && cetranVaz) return !!s.vencimento_cetran
+    return false
+  }
+
+  function proximaEtapa(s) {
+    if (s.defesa_previa === 'Indeferido' && (!s.jari || s.jari === 'Não realizado')) return 'JARI'
+    if (s.jari === 'Indeferido' && (!s.cetran || s.cetran === 'Não realizado')) return 'CETRAN'
+    return null
+  }
+
+  function getLista() { return lista }
+
+  async function garantirCarregado() {
+    if (!lista.length) await loadSuspensoes()
+  }
+
+  function getById(id) { return gSus(id) }
+
   function nomeCliente(s) {
     return s.clientes ? s.clientes.nome : '—'
   }
@@ -340,6 +368,20 @@ const Suspensoes = (() => {
     } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
+  // Protocolar recurso: marca a próxima etapa como Aguardando e limpa o
+  // vencimento correspondente (JARI ou CETRAN, conforme etKey).
+  async function confirmarRecurso(id, etKey) {
+    const s = gSus(id); if (!s) return
+    const vencKey = etKey === 'jari' ? 'vencimento_jari' : 'vencimento_cetran'
+    const fields = { [etKey]: 'Aguardando', [vencKey]: null, ultima_att: Data.today() }
+    try {
+      await updateSuspensao(id, fields)
+      UI.closeModal()
+      if (typeof renderRecursos === 'function') renderRecursos()
+      UI.notif('Recurso protocolado — suspensão voltou pra fila de verificação!')
+    } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+  }
+
   // ── MODAL NOVA SUSPENSÃO ──────────────────────────────────
   function abrirNova() {
     const html = [
@@ -439,6 +481,8 @@ const Suspensoes = (() => {
 
   return {
     render, renderLista, abrirDetalhe, abrirNova,
-    acFiltrar, acFechar, sortBy
+    acFiltrar, acFechar, sortBy,
+    precisaRecurso, proximaEtapa, getLista, garantirCarregado, getById,
+    confirmarRecurso, etapaAtual, statusAtual
   }
 })()
