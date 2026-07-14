@@ -129,6 +129,24 @@ const UI = (() => {
     if (cb) cb()
   }
 
+  // ── DETALHE COM ABAS ──────────────────────────────────────
+  // abas = [{id, label, badge?, render:()=>htmlString}]
+  let _tabs = []
+  function tabs(headerHtml, abas, ativa) {
+    _tabs = abas
+    const at = ativa || (abas[0] && abas[0].id)
+    const navHtml = abas.map(a =>
+      `<div class="tab${a.id === at ? ' on' : ''}" data-tab="${a.id}" onclick="UI._tabGo('${a.id}')">${a.label}${a.badge != null ? ` <span class="cnt">${a.badge}</span>` : ''}</div>`
+    ).join('')
+    const corpo = (abas.find(a => a.id === at) || abas[0]).render()
+    openModal(`<div class="detail">${headerHtml}<div class="tabs">${navHtml}</div><div id="tab-body" class="panel">${corpo}</div></div>`)
+  }
+  function _tabGo(id) {
+    document.querySelectorAll('#modal .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === id))
+    const a = (_tabs || []).find(x => x.id === id)
+    if (a) document.getElementById('tab-body').innerHTML = a.render()
+  }
+
   // ── TEMA CLARO/ESCURO ─────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t)
@@ -149,6 +167,7 @@ const UI = (() => {
     openModal, closeModal, modalClickBg,
     setLoading, acBuild, etapaSelect,
     updateStats, setFiltro,
-    applyTheme, toggleTheme, initTheme
+    applyTheme, toggleTheme, initTheme,
+    tabs, _tabGo
   }
 })()

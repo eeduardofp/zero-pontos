@@ -295,56 +295,49 @@ const Suspensoes = (() => {
         .map(v => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + (v || '—') + '</option>').join('')
     }
 
-    const html = [
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px">',
-      '<div class="modal-title">' + nomeCliente(s) + '</div>',
-      '</div>',
-      '<div class="modal-sub">Processo: ' + (s.processo || '—') + ' · Ano: ' + (s.ano || '—') + '</div>',
+    const cl = Data.gCliente(s.cliente_id)
+    const stepCell = (val, label, nome) => {
+      const terminal = val === 'Deferido' || val === 'Indeferido'
+      const cls = et === nome ? 'now' : (terminal ? 'done' : '')
+      return `<div class="step ${cls}"><div class="sl">${label}</div><div class="sv">${val || '—'}</div><div class="sd">${et === nome ? 'etapa atual' : (terminal ? val.toLowerCase() : 'não iniciada')}</div></div>`
+    }
+    const stepper = `<div class="stepper">${stepCell(s.defesa_previa,'Defesa Prévia','Defesa Prévia')}${stepCell(s.jari,'JARI','JARI')}${stepCell(s.cetran,'CETRAN','CETRAN')}</div>`
+    const fld = (l, v, mono) => `<div class="field"><div class="field-label">${l}</div><div class="field-val${mono ? ' mono' : ''}">${v || '—'}</div></div>`
 
-      '<div class="etapas" style="margin-bottom:16px">',
-      etapaBox('Defesa Prévia', s.defesa_previa),
-      etapaBox('JARI', s.jari),
-      etapaBox('CETRAN', s.cetran),
-      '</div>',
+    const header =
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:180px"><div class="modal-title">' + nomeCliente(s) + '</div>' +
+      '<div class="chips" style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="badge b-no">⚠ CNH</span><span class="badge b-blue">Etapa: ' + et + '</span></div>' +
+      '<div class="modal-sub" style="margin-top:8px">Processo ' + (s.processo || '—') + ' · Ano ' + (s.ano || '—') + (cl ? ' · ' + cl.nome : '') + '</div></div>' +
+      '<button class="btn btn-ghost btn-sm" onclick="UI._tabGo(\'editar\')">✎ Editar</button></div>'
 
-      '<div class="section-title" style="margin-bottom:8px">Detalhes</div>',
-      '<div class="field-grid" style="margin-bottom:16px">',
-      '<div class="field"><div class="field-label">Protocolo</div><div class="field-val mono" style="font-size:11px">' + (s.protocolo || '—') + '</div></div>',
-      '<div class="field"><div class="field-label">Senha</div><div class="field-val mono">' + (s.senha || '—') + '</div></div>',
-      '<div class="field"><div class="field-label">Etapa atual</div><div class="field-val">' + et + '</div></div>',
-      '<div class="field"><div class="field-label">Última atualização</div><div class="field-val">' + (s.ultima_att || '—') + (da !== null ? ' (' + (da === 0 ? 'hoje' : da + 'd atrás') + ')' : '') + '</div></div>',
-      '<div class="field"><div class="field-label">Vencimento JARI</div><div class="field-val">' + (s.vencimento_jari ? Data.fmtData(s.vencimento_jari) : '—') + '</div></div>',
-      '<div class="field"><div class="field-label">Vencimento CETRAN</div><div class="field-val">' + (s.vencimento_cetran ? Data.fmtData(s.vencimento_cetran) : '—') + '</div></div>',
-      '<div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">' + (s.observacao || '—') + '</div></div>',
-      '</div>',
-
-      '<div class="section-title" style="margin-bottom:8px">Documentos</div>',
-      '<div id="docs-box-sus" style="margin-bottom:16px"></div>',
-      '<div class="section-title" style="margin-bottom:10px">Editar</div>',
-      '<div class="form-row" style="margin-bottom:8px">',
-      '<div><label class="form-label">Processo</label><input class="form-ctrl" id="sus-ed-proc" value="' + (s.processo || '') + '" style="font-size:12px"></div>',
-      '<div><label class="form-label">Protocolo</label><input class="form-ctrl" id="sus-ed-proto" value="' + (s.protocolo || '') + '" style="font-size:12px"></div>',
-      '</div>',
-      '<div class="form-row" style="margin-bottom:8px">',
-      '<div><label class="form-label">Senha</label><input class="form-ctrl" id="sus-ed-senha" value="' + (s.senha || '') + '" style="font-size:12px"></div>',
-      '<div><label class="form-label">Ano</label><input class="form-ctrl" id="sus-ed-ano" type="number" value="' + (s.ano || '') + '" style="font-size:12px"></div>',
-      '</div>',
-      '<div class="form-row3" style="margin-bottom:8px">',
-      '<div><label class="form-label">Defesa Prévia</label><select class="form-ctrl" id="sus-ed-def" style="font-size:12px">' + selOpts('defesa_previa') + '</select></div>',
-      '<div><label class="form-label">JARI</label><select class="form-ctrl" id="sus-ed-jari" style="font-size:12px">' + selOpts('jari') + '</select></div>',
-      '<div><label class="form-label">CETRAN</label><select class="form-ctrl" id="sus-ed-cetran" style="font-size:12px">' + selOpts('cetran') + '</select></div>',
-      '</div>',
-      '<div class="form-row3" style="margin-bottom:8px">',
-      '<div><label class="form-label">Vencimento JARI</label><input type="date" class="form-ctrl" id="sus-ed-vjari" value="' + (s.vencimento_jari || '') + '" style="font-size:12px"></div>',
-      '<div><label class="form-label">Vencimento CETRAN</label><input type="date" class="form-ctrl" id="sus-ed-vcetran" value="' + (s.vencimento_cetran || '') + '" style="font-size:12px"></div>',
-      '<div><label class="form-label">Observação</label><input class="form-ctrl" id="sus-ed-obs" value="' + (s.observacao || '') + '" style="font-size:12px"></div>',
-      '</div>',
-      '<button class="btn btn-primary" id="sus-save-btn">Salvar alterações</button>'
-    ].join('')
-
-    UI.openModal(html)
-    document.getElementById('sus-save-btn').onclick = function() { salvarEdicao(id) }
-    Documentos.render('docs-box-sus', { suspensao_id: id })
+    const abas = [
+      { id: 'info', label: 'Informação', render: () => stepper +
+        '<div class="field-grid" style="margin-top:4px">' + fld('Protocolo', s.protocolo, true) + fld('Senha', s.senha, true) +
+        fld('Etapa atual', et) + fld('Última atualização', (s.ultima_att || '—') + (da !== null ? ' (' + (da === 0 ? 'hoje' : da + 'd atrás') + ')' : '')) +
+        fld('Observações', s.observacao) + '</div>' },
+      { id: 'docs', label: 'Documentos', render: () => { setTimeout(() => Documentos.render('docs-box-sus', { suspensao_id: id }), 0); return '<div id="docs-box-sus"></div>' } },
+      { id: 'prazos', label: 'Prazos', render: () => '<div class="field-grid">' + fld('Vencimento JARI', s.vencimento_jari ? Data.fmtData(s.vencimento_jari) : '—') + fld('Vencimento CETRAN', s.vencimento_cetran ? Data.fmtData(s.vencimento_cetran) : '—') + fld('Próxima etapa', proximaEtapa(s) || '—') + '</div>' },
+      { id: 'editar', label: 'Editar', render: () => {
+        setTimeout(() => { const b = document.getElementById('sus-save-btn'); if (b) b.onclick = () => salvarEdicao(id) }, 0)
+        return '<div class="form-row" style="margin-bottom:8px">' +
+          '<div><label class="form-label">Processo</label><input class="form-ctrl" id="sus-ed-proc" value="' + (s.processo || '') + '"></div>' +
+          '<div><label class="form-label">Protocolo</label><input class="form-ctrl" id="sus-ed-proto" value="' + (s.protocolo || '') + '"></div></div>' +
+          '<div class="form-row" style="margin-bottom:8px">' +
+          '<div><label class="form-label">Senha</label><input class="form-ctrl" id="sus-ed-senha" value="' + (s.senha || '') + '"></div>' +
+          '<div><label class="form-label">Ano</label><input class="form-ctrl" id="sus-ed-ano" type="number" value="' + (s.ano || '') + '"></div></div>' +
+          '<div class="form-row3" style="margin-bottom:8px">' +
+          '<div><label class="form-label">Defesa Prévia</label><select class="form-ctrl" id="sus-ed-def">' + selOpts('defesa_previa') + '</select></div>' +
+          '<div><label class="form-label">JARI</label><select class="form-ctrl" id="sus-ed-jari">' + selOpts('jari') + '</select></div>' +
+          '<div><label class="form-label">CETRAN</label><select class="form-ctrl" id="sus-ed-cetran">' + selOpts('cetran') + '</select></div></div>' +
+          '<div class="form-row3" style="margin-bottom:8px">' +
+          '<div><label class="form-label">Vencimento JARI</label><input type="date" class="form-ctrl" id="sus-ed-vjari" value="' + (s.vencimento_jari || '') + '"></div>' +
+          '<div><label class="form-label">Vencimento CETRAN</label><input type="date" class="form-ctrl" id="sus-ed-vcetran" value="' + (s.vencimento_cetran || '') + '"></div>' +
+          '<div><label class="form-label">Observação</label><input class="form-ctrl" id="sus-ed-obs" value="' + (s.observacao || '') + '"></div></div>' +
+          '<button class="btn btn-primary" id="sus-save-btn">Salvar alterações</button>'
+      } }
+    ]
+    UI.tabs(header, abas, 'info')
   }
 
   async function salvarEdicao(id) {

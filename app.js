@@ -649,29 +649,48 @@ function openCliente(cid) {
   if (c.endereco) contatoHTML += '<div style="margin-bottom:4px;font-size:13px">Endereço: ' + c.endereco + (c.cep ? ' · CEP ' + c.cep : '') + '</div>'
   const fatHTML = fat > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Total: <span style="color:var(--green);font-family:var(--mono)">${Data.fmtMoeda(fat)}</span></div>` : ''
 
-  UI.openModal(
-    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3px;gap:6px;flex-wrap:wrap">' +
-    '<div class="modal-title">' + c.nome + '</div>' +
-    '<div style="display:flex;gap:6px">' +
-    '<button class="btn btn-ghost btn-sm" id="cl-edit-btn">✎ Editar</button>' +
-    '<button class="btn btn-ghost btn-sm" id="cl-rel-btn">📄 Relatório</button>' +
-    '<button class="btn btn-danger btn-sm" id="cl-del-btn">Excluir</button>' +
-    '</div>' +
-    '</div>' +
-    '<div class="modal-sub">' + ativas + ' processos ativos · ' + aitsAll.length + ' total</div>' +
-    contatoHTML + fatHTML +
-    '<div style="margin-top:14px"><div class="section-title">Documentos do titular</div>' +
-    '<div id="docs-box-cli" style="margin-bottom:14px"></div></div>' +
-    '<div style="margin-top:14px"><div class="section-title">Placas e AITs</div>' +
-    (placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>') + '</div>'
-  )
-  const editBtn = document.getElementById('cl-edit-btn')
-  if (editBtn) editBtn.onclick = function() { editarCliente(cid) }
-  const relBtn = document.getElementById('cl-rel-btn')
-  if (relBtn) relBtn.onclick = function() { gerarRelatorioCliente(cid) }
-  const delCliBtn = document.getElementById('cl-del-btn')
-  if (delCliBtn) delCliBtn.onclick = function() { excluirCliente(cid) }
-  Documentos.render('docs-box-cli', { cliente_id: cid })
+  const susCliente = (typeof Suspensoes !== 'undefined' ? Suspensoes.getLista() : []).filter(s => s.cliente_id === cid)
+  const header =
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+    '<div style="flex:1;min-width:180px"><div class="modal-title">' + c.nome + '</div>' +
+    '<div class="modal-sub" style="margin-top:6px">' + ativas + ' processos ativos · ' + aitsAll.length + ' total' + (fat > 0 ? ' · ' + Data.fmtMoeda(fat) : '') + '</div></div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+    '<button class="btn btn-ghost btn-sm" onclick="editarCliente(\'' + cid + '\')">✎ Editar</button>' +
+    '<button class="btn btn-ghost btn-sm" onclick="gerarRelatorioCliente(\'' + cid + '\')">📄 Relatório</button>' +
+    '<button class="btn btn-ghost btn-sm" onclick="fundirCliente(\'' + cid + '\')">🔗 Fundir</button>' +
+    '<button class="btn btn-danger btn-sm" onclick="excluirCliente(\'' + cid + '\')">Excluir</button>' +
+    '</div></div>'
+
+  const abas = [
+    { id: 'info', label: 'Informação', render: () => (contatoHTML + fatHTML) || '<div style="color:var(--text3)">Sem dados de contato. Use Editar.</div>' },
+    { id: 'docs', label: 'Documentos', render: () => { setTimeout(() => Documentos.render('docs-box-cli', { cliente_id: cid }), 0); return '<div id="docs-box-cli"></div>' } },
+    { id: 'casos', label: 'AITs & placas', badge: aitsAll.length, render: () => placasHTML || '<div style="color:var(--text3)">Nenhuma placa</div>' },
+    { id: 'sus', label: 'Suspensões', badge: susCliente.length, render: () => susCliente.length
+        ? susCliente.map(s => `<div class="field" style="margin-bottom:6px;cursor:pointer" onclick="Suspensoes.abrirDetalhe('${s.id}')"><div class="field-label">Processo ${s.processo || '—'}</div><div class="field-val">${Suspensoes.etapaAtual(s)} · ${Suspensoes.statusAtual(s)}</div></div>`).join('')
+        : '<div style="color:var(--text3)">Nenhuma suspensão</div>' },
+    { id: 'fin', label: 'Financeiro', render: () => '<div class="field-grid"><div class="field"><div class="field-label">Total registrado</div><div class="field-val" style="color:var(--green)">' + Data.fmtMoeda(fat) + '</div></div></div><button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="gerarRelatorioCliente(\'' + cid + '\')">📄 Gerar relatório Excel</button>' }
+  ]
+  UI.tabs(header, abas, 'info')
+}
+
+async function fundirCliente(cid) {
+  const base = Data.gCliente(cid); if (!base) return
+  const nome = prompt('Fundir "' + base.nome + '" COM qual cliente? Digite parte do nome do cliente que vai PERMANECER:')
+  if (!nome) return
+  const alvos = Data.getClientes().filter(c => c.id !== cid && (c.nome || '').toLowerCase().includes(nome.toLowerCase()))
+  if (alvos.length !== 1) { UI.notif(alvos.length ? 'Vários clientes batem, seja mais específico' : 'Nenhum cliente encontrado', 'error'); return }
+  const alvo = alvos[0]
+  if (!confirm('Mover placas, suspensões e documentos de "' + base.nome + '" para "' + alvo.nome + '" e apagar o duplicado?')) return
+  const db = Auth.getClient()
+  try {
+    await db.from('placas').update({ cliente_id: alvo.id }).eq('cliente_id', cid)
+    await db.from('suspensoes').update({ cliente_id: alvo.id }).eq('cliente_id', cid)
+    await db.from('documentos').update({ cliente_id: alvo.id }).eq('cliente_id', cid)
+    await db.from('clientes').delete().eq('id', cid)
+    const all = await API.loadAll(); Data.load(all); UI.updateStats()
+    UI.closeModal(); UI.notif('Clientes fundidos!')
+    openCliente(alvo.id)
+  } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
 }
 
 function editarCliente(cid) {
@@ -789,64 +808,78 @@ async function salvarEdicaoPlaca(pid, cid) {
   } catch(e) { UI.notif('Erro: ' + e.message, 'error') }
 }
 
+// stepper de 3 etapas para AIT
+function stepperAIT(a) {
+  const et = Data.etapaAtual(a)
+  const cell = (key, label, nome) => {
+    const v = a[key] || ''
+    const terminal = v === 'Deferido' || v === 'Indeferido'
+    const cls = et === nome ? 'now' : (terminal ? 'done' : '')
+    return `<div class="step ${cls}"><div class="sl">${label}</div><div class="sv">${v || '—'}</div><div class="sd">${et === nome ? 'etapa atual' : (terminal ? v.toLowerCase() : 'não iniciada')}</div></div>`
+  }
+  return `<div class="stepper">${cell('defesa_previa','Defesa Prévia','Defesa Prévia')}${cell('jari','JARI','JARI')}${cell('segunda_instancia','2ª Instância','2ª Instância')}</div>`
+}
+
 function openAIT(aid) {
   const a = Data.gAIT(aid); if (!a) return
   const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
-  const et = Data.etapaAtual(a), da = Data.daysSince(a.ultima_att)
-  const etHTML = (key, label) => {
-    const s = a[key] || '', cls = UI.etClass(s)
-    return '<div class="etapa ' + cls + '"><div class="etapa-label">' + label + '</div><div class="etapa-val">' + (s || '—') + '</div></div>'
-  }
-  UI.openModal(
-    '<div class="modal-title" style="font-family:var(--mono);font-size:13px;word-break:break-all">' + a.codigo + '</div>' +
-    '<div class="modal-sub">' + (cl ? cl.nome : '—') + ' · ' + (pl ? pl.placa : '—') + (pl ? ' · Renavan: ' + pl.renavan : '') + '</div>' +
-    '<div class="etapas" style="margin-bottom:16px">' +
-      etHTML('defesa_previa','Defesa Prévia') + etHTML('jari','JARI') + etHTML('segunda_instancia','2ª Instância') +
-    '</div>' +
-    '<div class="section-title" style="margin-bottom:8px">Detalhes</div>' +
-    '<div class="field-grid" style="margin-bottom:16px">' +
-      '<div class="field"><div class="field-label">Enquadramento</div><div class="field-val">' + (a.enquadramento || '—') + '</div></div>' +
-      '<div class="field"><div class="field-label">Etapa atual</div><div class="field-val">' + et + '</div></div>' +
-      '<div class="field"><div class="field-label">Protocolo</div><div class="field-val mono">' + (a.protocolo || '—') + '</div></div>' +
-      '<div class="field"><div class="field-label">Senha</div><div class="field-val mono">' + (a.senha || '—') + '</div></div>' +
-      '<div class="field"><div class="field-label">Última atualização</div><div class="field-val">' + (a.ultima_att || '—') + (da < 999 ? ' (' + da + 'd atrás)' : '') + '</div></div>' +
-      '<div class="field"><div class="field-label">Vencimento</div><div class="field-val">' + (a.vencimento || '—') + '</div></div>' +
-      '<div class="field"><div class="field-label">Data da venda</div><div class="field-val">' + Data.fmtData(a.data_venda) + '</div></div>' +
-      '<div class="field"><div class="field-label">Valor do serviço</div><div class="field-val" style="color:var(--green)">' + (a.valor ? Data.fmtMoeda(a.valor) : '—') + '</div></div>' +
-      '<div class="field" style="grid-column:1/-1"><div class="field-label">Observações</div><div class="field-val">' + (a.observacao || '—') + '</div></div>' +
-    '</div>' +
-    '<div class="section-title" style="margin-bottom:8px">Documentos</div>' +
-    '<div id="docs-box" style="margin-bottom:16px"></div>' +
-    '<div class="section-title" style="margin-bottom:10px">Editar</div>' +
-    '<div class="form-row" style="margin-bottom:8px">' +
-      '<div><label class="form-label">Código da AIT</label><input class="form-ctrl" id="ed-codigo" value="' + (a.codigo || '') + '" style="font-size:12px"></div>' +
-      '<div><label class="form-label">Enquadramento</label><input class="form-ctrl" id="ed-enq" value="' + (a.enquadramento || '') + '" style="font-size:12px"></div>' +
-    '</div>' +
-    '<div class="form-row" style="margin-bottom:8px">' +
-      '<div><label class="form-label">Protocolo</label><input class="form-ctrl" id="ed-proto" value="' + (a.protocolo || '') + '" style="font-size:12px"></div>' +
-      '<div><label class="form-label">Senha</label><input class="form-ctrl" id="ed-senha" value="' + (a.senha || '') + '" style="font-size:12px"></div>' +
-    '</div>' +
-    '<div class="form-row3" style="margin-bottom:8px">' +
-      '<div><label class="form-label">Defesa Prévia</label>' + UI.etapaSelect('ed-def', a.defesa_previa) + '</div>' +
-      '<div><label class="form-label">JARI</label>' + UI.etapaSelect('ed-jari', a.jari) + '</div>' +
-      '<div><label class="form-label">2ª Instância</label>' + UI.etapaSelect('ed-seg', a.segunda_instancia) + '</div>' +
-    '</div>' +
-    '<div class="form-row" style="margin-bottom:8px">' +
-      '<div><label class="form-label">Vencimento do recurso</label><input type="date" class="form-ctrl" id="ed-venc" value="' + (a.vencimento || '') + '" style="font-size:12px"></div>' +
-      '<div><label class="form-label">Data da venda</label><input type="date" class="form-ctrl" id="ed-dvenda" value="' + (a.data_venda || '') + '" style="font-size:12px"></div>' +
-    '</div>' +
-    '<div class="form-row" style="margin-bottom:12px">' +
-      '<div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="' + (a.valor || '') + '" placeholder="0,00" style="font-size:12px"></div>' +
-      '<div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="' + (a.observacao || '') + '" style="font-size:12px"></div>' +
-    '</div>' +
-    '<button class="btn btn-primary" id="ait-save-btn">Salvar alterações</button>' +
-    '<button class="btn btn-danger" id="ait-del-btn" style="margin-left:8px">Excluir AIT</button>'
-  )
-  const aitSaveBtn = document.getElementById('ait-save-btn')
-  if (aitSaveBtn) aitSaveBtn.onclick = function() { salvarEdicaoAIT(aid) }
-  const aitDelBtn = document.getElementById('ait-del-btn')
-  if (aitDelBtn) aitDelBtn.onclick = function() { excluirAIT(aid) }
-  Documentos.render('docs-box', { ait_id: aid })
+  const et = Data.etapaAtual(a), da = Data.daysSince(a.ultima_att), u = Data.urgLabel(a.vencimento)
+  const field = (label, val, mono) => `<div class="field"><div class="field-label">${label}</div><div class="field-val${mono ? ' mono' : ''}">${val || '—'}</div></div>`
+
+  const header =
+    `<div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div class="modal-title" style="font-family:var(--mono);word-break:break-all">${a.codigo}</div>
+        <div class="chips" style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <span class="badge b-blue">Etapa: ${et}</span>${UI.badge(Data.statusAtual(a))}<span class="badge ${u.c}">${u.t}</span>
+        </div>
+        <div class="modal-sub" style="margin-top:8px">${cl ? `<a href="#" onclick="openCliente('${cl.id}');return false" style="color:var(--blue)">${cl.nome}</a>` : '—'} · ${pl ? pl.placa : '—'}${pl ? ' · Renavan ' + pl.renavan : ''} · ${a.enquadramento || '—'}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="UI._tabGo('editar')">✎ Editar</button>
+        ${Data.precisaRecurso(a) ? `<button class="btn btn-primary btn-sm" onclick="openRecurso('${aid}')">⚖ Protocolar</button>` : ''}
+      </div>
+    </div>`
+
+  const abas = [
+    { id: 'info', label: 'Informação', render: () => stepperAIT(a) +
+      '<div class="field-grid" style="margin-top:4px">' +
+      field('Enquadramento', a.enquadramento) + field('Etapa atual', et) +
+      field('Protocolo', a.protocolo, true) + field('Senha', a.senha, true) +
+      field('Última atualização', (a.ultima_att || '—') + (da < 999 ? ` (${da}d atrás)` : '')) +
+      field('Observações', a.observacao) + '</div>' },
+    { id: 'docs', label: 'Documentos', render: () => { setTimeout(() => Documentos.render('docs-box', { ait_id: aid }), 0); return '<div id="docs-box"></div>' } },
+    { id: 'prazos', label: 'Prazos & histórico', render: () =>
+      '<div class="field-grid">' + field('Vencimento do recurso', Data.fmtData(a.vencimento)) + field('Próxima etapa', Data.proximaEtapa(a) || '—') +
+      field('Última atualização', a.ultima_att) + field('Data da venda', Data.fmtData(a.data_venda)) + '</div>' },
+    { id: 'financeiro', label: 'Financeiro', render: () =>
+      '<div class="field-grid">' + field('Valor do serviço', a.valor ? Data.fmtMoeda(a.valor) : '—') + field('Pagamento', a.pagamento) + field('Data da venda', Data.fmtData(a.data_venda)) + '</div>' },
+    { id: 'editar', label: 'Editar', render: () => {
+      setTimeout(() => {
+        const sv = document.getElementById('ait-save-btn'); if (sv) sv.onclick = () => salvarEdicaoAIT(aid)
+        const dl = document.getElementById('ait-del-btn'); if (dl) dl.onclick = () => excluirAIT(aid)
+      }, 0)
+      return '<div class="form-row" style="margin-bottom:8px">' +
+        '<div><label class="form-label">Código da AIT</label><input class="form-ctrl" id="ed-codigo" value="' + (a.codigo || '') + '"></div>' +
+        '<div><label class="form-label">Enquadramento</label><input class="form-ctrl" id="ed-enq" value="' + (a.enquadramento || '') + '"></div></div>' +
+        '<div class="form-row" style="margin-bottom:8px">' +
+        '<div><label class="form-label">Protocolo</label><input class="form-ctrl" id="ed-proto" value="' + (a.protocolo || '') + '"></div>' +
+        '<div><label class="form-label">Senha</label><input class="form-ctrl" id="ed-senha" value="' + (a.senha || '') + '"></div></div>' +
+        '<div class="form-row3" style="margin-bottom:8px">' +
+        '<div><label class="form-label">Defesa Prévia</label>' + UI.etapaSelect('ed-def', a.defesa_previa) + '</div>' +
+        '<div><label class="form-label">JARI</label>' + UI.etapaSelect('ed-jari', a.jari) + '</div>' +
+        '<div><label class="form-label">2ª Instância</label>' + UI.etapaSelect('ed-seg', a.segunda_instancia) + '</div></div>' +
+        '<div class="form-row" style="margin-bottom:8px">' +
+        '<div><label class="form-label">Vencimento do recurso</label><input type="date" class="form-ctrl" id="ed-venc" value="' + (a.vencimento || '') + '"></div>' +
+        '<div><label class="form-label">Data da venda</label><input type="date" class="form-ctrl" id="ed-dvenda" value="' + (a.data_venda || '') + '"></div></div>' +
+        '<div class="form-row" style="margin-bottom:12px">' +
+        '<div><label class="form-label">Valor (R$)</label><input type="number" step="0.01" class="form-ctrl" id="ed-valor" value="' + (a.valor || '') + '"></div>' +
+        '<div><label class="form-label">Observação</label><input class="form-ctrl" id="ed-obs" value="' + (a.observacao || '') + '"></div></div>' +
+        '<button class="btn btn-primary" id="ait-save-btn">Salvar alterações</button>' +
+        '<button class="btn btn-danger" id="ait-del-btn" style="margin-left:8px">Excluir AIT</button>'
+    } }
+  ]
+  UI.tabs(header, abas, 'info')
 }
 
 async function salvarEdicaoAIT(aid) {
