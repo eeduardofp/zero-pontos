@@ -49,7 +49,10 @@ function montarPlano(dados, raiz = SHARE) {
 
     const cliente = M.casarClientePorNome(p.clientePasta, dados.clientes)
     if (!cliente) {
-      Object.assign(linha, { acao: 'revisar', motivo: 'cliente não encontrado no banco' })
+      // Decisão 2026-07-14: cliente fora do banco (maioria 2021/22 sem
+      // atividade posterior) fica de fora. Cadastrar o cliente no app e
+      // re-rodar o dry-run resgata essas linhas automaticamente.
+      Object.assign(linha, { acao: 'ignorar', motivo: 'cliente não encontrado no banco' })
       linhas.push(linha); continue
     }
     linha.destino_nome = cliente.nome
@@ -72,12 +75,18 @@ function montarPlano(dados, raiz = SHARE) {
     }
 
     if (!dono) {
-      // caso sem AIT/suspensão casada: sugere anexar no CLIENTE (revisável) —
-      // melhor achável no cliente do que ficar de fora da migração
-      Object.assign(linha, {
-        acao: 'revisar', destino: 'cliente_id:' + cliente.id, confianca: 'baixa',
-        motivo: 'caso sem código casado — sugerido anexar no cliente',
-      })
+      // Decisão 2026-07-14: caso sem código casado → só CNH/CRLV sobem,
+      // anexados no CLIENTE; o resto do caso duvidoso fica de fora.
+      if (linha.tipo === 'CNH' || linha.tipo === 'CRLV') {
+        const chaveDupCli = [cliente.id, p.arquivo, tamanho].join('|')
+        Object.assign(linha, {
+          acao: jaSubidos.has(chaveDupCli) ? 'ja_subido' : 'subir',
+          destino: 'cliente_id:' + cliente.id, confianca: 'alta',
+          motivo: 'documento do titular — caso sem código casado',
+        })
+      } else {
+        Object.assign(linha, { acao: 'ignorar', motivo: 'caso sem código casado' })
+      }
       linhas.push(linha); continue
     }
 
