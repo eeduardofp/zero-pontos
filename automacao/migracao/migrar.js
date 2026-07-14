@@ -53,14 +53,23 @@ async function upload(csvPath) {
   await sb.login()
   const { data: sess } = await sb.getClient().auth.getSession()
   const jwt = sess.session.access_token
-  const linhas = inv.lerCSV(csvPath).filter(l => l.acao === 'subir')
-  console.log(`${linhas.length} arquivos para subir.`)
 
-  let ok = 0, falhas = 0
+  // Resumível: carrega o que já está no cofre e pula (dono|nome|tamanho)
+  // repetido. Torna --upload seguro de re-rodar após interrupção.
+  const dados = await sb.carregarTudoMigracao()
+  const jaSubidos = new Set(dados.documentos.map(d =>
+    [(d.ait_id || d.cliente_id || d.suspensao_id), d.nome_arquivo, d.tamanho_bytes].join('|')))
+  console.log(`${jaSubidos.size} documentos já no cofre (serão pulados).`)
+
+  const linhas = inv.lerCSV(csvPath).filter(l => l.acao === 'subir')
+  console.log(`${linhas.length} arquivos marcados para subir.`)
+
+  let ok = 0, falhas = 0, pulados = 0
   const inicio = Date.now()
   for (const [i, l] of linhas.entries()) {
     const [col, donoId] = String(l.destino).split(':')
     if (!PREFIXO[col] || !donoId) { console.log(`PULA (destino inválido): ${l.caminho}`); falhas++; continue }
+    if (jaSubidos.has([donoId, l.arquivo, l.tamanho].join('|'))) { pulados++; continue }
     try {
       const abs = path.join(inv.SHARE, l.caminho)
       const buf = fs.readFileSync(abs)
@@ -79,18 +88,19 @@ async function upload(csvPath) {
         tamanho_bytes: l.tamanho, mime: 'application/octet-stream',
       })
       if (error) throw new Error(error.message)
+      jaSubidos.add([donoId, l.arquivo, l.tamanho].join('|'))
       ok++
-      if ((ok + falhas) % 50 === 0) {
+      if (ok % 50 === 0) {
         const min = ((Date.now() - inicio) / 60000).toFixed(1)
-        console.log(`  ${i + 1}/${linhas.length} (${min} min)...`)
+        console.log(`  ${i + 1}/${linhas.length} — ${ok} enviados (${min} min)...`)
       }
     } catch (e) {
       falhas++
       console.log(`FALHA: ${l.caminho} — ${e.message}`)
     }
   }
-  console.log(`\nConcluído: ${ok} enviados, ${falhas} falhas.`)
-  console.log('Rodar o dry-run de novo mostra os enviados como "ja_subido" (retomável).')
+  console.log(`\nConcluído: ${ok} enviados, ${pulados} já existiam, ${falhas} falhas.`)
+  console.log('Re-rodar --upload é seguro: pula o que já subiu (idempotente).')
 }
 
 const args = process.argv.slice(2)
