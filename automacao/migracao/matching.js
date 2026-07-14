@@ -1,7 +1,7 @@
 // ─── MATCHING (migração do legado) ───────────────────────────
 // Funções puras: parsing dos caminhos do share e casamento com o banco.
 // Nenhum acesso a disco ou rede aqui — tudo testável isolado.
-const { mesmoCodigo } = require('../mapeamento')
+const { mesmoCodigo, contemCodigo } = require('../mapeamento')
 
 const RAIZ_DEFESAS = '1. NOVO MODELO DEFESAS ADMINISTRATIVAS'
 const EXTENSOES = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'])
@@ -101,11 +101,13 @@ function casarClientePorNome(pasta, clientes) {
 }
 
 // Pasta de caso → AIT. Restringe às AITs do cliente casado (via placas) e
-// usa mesmoCodigo (tolerante a truncamento/formatos) contra o nome da pasta.
+// pergunta numa direção só: o NOME DA PASTA contém o código da AIT?
+// (A direção inversa — código estruturado contém pedaço do nome da pasta —
+// gerava falso-ambíguo: "GUARAMIRIM" no nome casava com toda AIT da cidade.)
 function casarAIT(nomeCaso, clienteId, dados) {
   const placasCliente = new Set(dados.placas.filter(p => p.cliente_id === clienteId).map(p => p.id))
   const doCliente = dados.aits.filter(a => placasCliente.has(a.placa_id))
-  const casadas = doCliente.filter(a => a.codigo && mesmoCodigo(nomeCaso, a.codigo))
+  const casadas = doCliente.filter(a => a.codigo && contemCodigo(nomeCaso, a.codigo))
   if (casadas.length === 1) return { ait: casadas[0], confianca: 'alta' }
   if (casadas.length > 1) return { ait: casadas[0], confianca: 'ambigua' }
   return null

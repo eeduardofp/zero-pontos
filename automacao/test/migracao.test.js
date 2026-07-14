@@ -125,6 +125,18 @@ test('casarAIT: código no nome do caso casa com a AIT do cliente', () => {
   assert.equal(r.confianca, 'alta')
 })
 
+test('casarAIT: cidade no nome da pasta não gera falso-ambíguo', () => {
+  const clientes = [{ id: 'c1', nome: 'JONATHAS ALVARES' }]
+  const placas = [{ id: 'p1', cliente_id: 'c1' }]
+  const aits = [
+    { id: 'a1', codigo: 'GUARAMIRIM-000123-P09FW000KC-1234-0', placa_id: 'p1' },
+    { id: 'a2', codigo: 'GUARAMIRIM-000124-P09FW000KD-1234-0', placa_id: 'p1' },
+  ]
+  const r = M.casarAIT('JARI. P09FW000KC. Jonatha. GUARAMIRIM', 'c1', { aits, placas, clientes })
+  assert.equal(r.ait.id, 'a1')
+  assert.equal(r.confianca, 'alta')
+})
+
 test('casarAIT: sem código que case retorna null', () => {
   const clientes = [{ id: 'c1', nome: 'X' }]
   const placas = [{ id: 'p1', cliente_id: 'c1' }]
