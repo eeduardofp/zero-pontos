@@ -151,10 +151,30 @@ test('casarSuspensao: única suspensão do cliente é alta', () => {
   assert.equal(r.confianca, 'alta')
 })
 
-test('casarSuspensao: duas sem processo no nome é ambígua', () => {
+test('casarSuspensao: processo no nome do caso desempata', () => {
   const sus = [
     { id: 's1', cliente_id: 'c1', processo: 'PROC111111' },
     { id: 's2', cliente_id: 'c1', processo: 'PROC222222' },
+  ]
+  const r = M.casarSuspensao('Defesa PROC222222', 'c1', sus)
+  assert.equal(r.suspensao.id, 's2')
+  assert.equal(r.confianca, 'alta')
+})
+
+test('casarSuspensao: sem processo, uma só ATIVA → casa nela com alta', () => {
+  const sus = [
+    { id: 's1', cliente_id: 'c1', processo: 'PROC111111', encerrado: true },
+    { id: 's2', cliente_id: 'c1', processo: 'PROC222222', encerrado: false },
+  ]
+  const r = M.casarSuspensao('Defesa', 'c1', sus)
+  assert.equal(r.suspensao.id, 's2')
+  assert.equal(r.confianca, 'alta')
+})
+
+test('casarSuspensao: sem processo, duas ativas → ambígua', () => {
+  const sus = [
+    { id: 's1', cliente_id: 'c1', processo: 'PROC111111', encerrado: false },
+    { id: 's2', cliente_id: 'c1', processo: 'PROC222222', encerrado: false },
   ]
   const r = M.casarSuspensao('Defesa', 'c1', sus)
   assert.equal(r.confianca, 'ambigua')

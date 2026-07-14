@@ -22,8 +22,15 @@ async function dryRun() {
   console.log(`  ${dados.aits.length} AITs · ${dados.clientes.length} clientes · ${dados.suspensoes.length} suspensões · ${dados.documentos.length} docs já no cofre`)
   console.log('Varrendo o share (somente leitura)...')
   const plano = inv.montarPlano(dados)
-  const csv = path.join(__dirname, 'plano-migracao.csv')
-  inv.gravarCSV(plano, csv)
+  let csv = path.join(__dirname, 'plano-migracao.csv')
+  try {
+    inv.gravarCSV(plano, csv)
+  } catch (e) {
+    if (e.code !== 'EBUSY') throw e
+    // CSV aberto no Excel: grava com sufixo em vez de perder a varredura
+    csv = path.join(__dirname, 'plano-migracao-' + Date.now().toString(36) + '.csv')
+    inv.gravarCSV(plano, csv)
+  }
 
   const porAcao = {}
   for (const l of plano) porAcao[l.acao] = (porAcao[l.acao] || 0) + 1

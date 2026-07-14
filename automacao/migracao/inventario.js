@@ -90,12 +90,25 @@ function montarPlano(dados, raiz = SHARE) {
       linhas.push(linha); continue
     }
 
+    if (dono.conf === 'ambigua') {
+      // Decisão 2026-07-14: destino incerto (ex.: cliente com 2+ suspensões
+      // ativas) → anexa no CLIENTE em vez de arriscar o processo errado.
+      // Fica achável abrindo o cliente no app.
+      const chaveDupCli = [cliente.id, p.arquivo, tamanho].join('|')
+      Object.assign(linha, {
+        acao: jaSubidos.has(chaveDupCli) ? 'ja_subido' : 'subir',
+        destino: 'cliente_id:' + cliente.id, confianca: 'ambigua',
+        motivo: 'destino incerto — anexado ao titular',
+      })
+      linhas.push(linha); continue
+    }
+
     const chaveDup = [dono.id, p.arquivo, tamanho].join('|')
     Object.assign(linha, {
-      acao: jaSubidos.has(chaveDup) ? 'ja_subido' : (dono.conf === 'alta' ? 'subir' : 'revisar'),
+      acao: jaSubidos.has(chaveDup) ? 'ja_subido' : 'subir',
       destino: dono.col + ':' + dono.id,
       confianca: dono.conf,
-      motivo: dono.conf === 'ambigua' ? 'mais de um destino possível' : '',
+      motivo: '',
     })
     linhas.push(linha)
   }

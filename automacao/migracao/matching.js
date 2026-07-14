@@ -113,8 +113,12 @@ function casarAIT(nomeCaso, clienteId, dados) {
   return null
 }
 
-// Cliente → suspensão. A pasta de caso raramente traz o nº do processo;
-// quando traz, desempata. Uma suspensão só no cliente → alta.
+// Cliente → suspensão. Desempate em cascata:
+//   1) nº do processo no nome da pasta bate com o de uma suspensão;
+//   2) uma suspensão só no cliente;
+//   3) sem processo mas só UMA ativa (encerrado != true) → é essa.
+// Caso contrário (2+ ativas, ou todas encerradas) → ambígua: quem chama
+// resolve anexando no cliente, evitando pendurar no processo errado.
 function casarSuspensao(nomeCaso, clienteId, suspensoes) {
   const doCliente = suspensoes.filter(s => s.cliente_id === clienteId)
   if (!doCliente.length) return null
@@ -123,6 +127,8 @@ function casarSuspensao(nomeCaso, clienteId, suspensoes) {
     if (porProcesso.length === 1) return { suspensao: porProcesso[0], confianca: 'alta' }
   }
   if (doCliente.length === 1) return { suspensao: doCliente[0], confianca: 'alta' }
+  const ativas = doCliente.filter(s => s.encerrado !== true)
+  if (ativas.length === 1) return { suspensao: ativas[0], confianca: 'alta' }
   return { suspensao: doCliente[0], confianca: 'ambigua' }
 }
 
