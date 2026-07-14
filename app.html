@@ -15,36 +15,20 @@
 </div>
 
 <div id="sidebar">
-  <div class="logo"><h1>AIT Control</h1><span>gestão de autuações</span></div>
+  <div class="logo"><h1>Zero Pontos</h1><span>AIT CONTROL</span></div>
   <nav>
-    <a class="active" data-page="dashboard" onclick="nav('dashboard')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Visão geral
-    </a>
-    <a data-page="busca" onclick="nav('busca')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Busca global
-    </a>
-    <a data-page="clientes" onclick="nav('clientes')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clientes
-    </a>
-    <a data-page="aits" onclick="nav('aits')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>AITs
-    </a>
-    <a data-page="kanban" onclick="nav('kanban')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18"/><rect x="10" y="3" width="5" height="12"/><rect x="17" y="3" width="5" height="15"/></svg>Fila de verificação
-    </a>
-    <a data-page="recursos" onclick="nav('recursos')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Fila de recursos
-    </a>
-<!-- financeiro desativado -->
-    <a data-page="suspensoes" onclick="nav('suspensoes')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Suspensões
-    </a>
-    <a data-page="comercial" onclick="nav('comercial')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Comercial
-    </a>
-    <a data-page="cadastro" onclick="nav('cadastro')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Novo cadastro
-    </a>
+    <div class="navsec">Operação</div>
+    <a class="active" data-page="hoje" onclick="nav('hoje')"><span style="width:18px">📊</span>Hoje</a>
+    <a data-page="busca" onclick="nav('busca')"><span style="width:18px">🔎</span>Busca geral</a>
+    <a data-page="calendario" onclick="nav('calendario')"><span style="width:18px">📅</span>Calendário</a>
+    <a data-page="recursos" onclick="nav('recursos')"><span style="width:18px">⚖️</span>Fila de recursos</a>
+    <div class="navsec">Cadastro</div>
+    <a data-page="clientes" onclick="nav('clientes')"><span style="width:18px">👤</span>Clientes</a>
+    <a data-page="aits" onclick="nav('aits')"><span style="width:18px">🚗</span>AITs</a>
+    <a data-page="suspensoes" onclick="nav('suspensoes')"><span style="width:18px">🪪</span>Suspensões</a>
+    <div class="navsec">Gestão</div>
+    <a data-page="comercial" onclick="nav('comercial')"><span style="width:18px">💼</span>Comercial</a>
+    <a data-page="kanban" onclick="nav('kanban')"><span style="width:18px">📋</span>Kanban</a>
   </nav>
   <div class="stats" id="sidebar-stats"></div>
   <div class="user-bar">
@@ -55,8 +39,17 @@
 
 <div id="main">
 
-<div class="page active" id="pg-dashboard">
-  <div class="page-header"><div><div class="page-title">Visão geral</div><div class="page-sub">Resumo operacional</div></div></div>
+<div id="topbar">
+  <div class="gsearch">
+    <input id="global-q" placeholder="Buscar placa, código, cliente, CPF, documento…  ( / )" oninput="buscaGlobal(this.value)" onkeydown="if(event.key==='Escape')fecharBusca()" autocomplete="off">
+    <div id="global-results"></div>
+  </div>
+  <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="UI.toggleTheme()" title="Alternar tema">🌙</button>
+  <button class="btn btn-primary btn-sm" onclick="nav('cadastro')">+ Novo</button>
+</div>
+
+<div class="page active" id="pg-hoje">
+  <div class="page-header"><div><div class="page-title">Hoje</div><div class="page-sub">Resumo operacional</div></div></div>
   <div class="metrics" id="dash-metrics"></div>
   <div class="grid2">
     <div class="tbl-wrap">
@@ -331,6 +324,8 @@
   </div>
   <div class="pager" id="sus-pager"></div>
 </div>
+
+<div class="page" id="pg-calendario"><div id="calendario-root"></div></div>
 
 </div><!-- end main -->
 

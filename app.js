@@ -7,6 +7,7 @@ let kanbanAno = 'todos', kanbanGroup = 'cliente'
 
 // ── INICIALIZAÇÃO ─────────────────────────────────────────────
 async function initApp() {
+  UI.initTheme()
   UI.setLoading(true)
   const session = await Auth.requireAuth()
   if (!session) return
@@ -17,7 +18,7 @@ async function initApp() {
     const db = await API.loadAll()
     Data.load(db)
     UI.updateStats()
-    nav('dashboard')
+    nav('hoje')
   } catch (e) {
     UI.notif('Erro ao carregar dados: ' + e.message, 'error')
   } finally {
@@ -30,7 +31,7 @@ function nav(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
   document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page))
   document.getElementById('pg-' + page).classList.add('active')
-  if (page === 'dashboard')  renderDashboard()
+  if (page === 'hoje')       (typeof Home !== 'undefined' ? Home.render() : renderDashboard())
   if (page === 'clientes')   renderClientes(1)
   if (page === 'aits')       renderAITs(1)
   if (page === 'kanban')     renderKanban()

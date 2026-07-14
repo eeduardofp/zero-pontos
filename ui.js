@@ -129,10 +129,26 @@ const UI = (() => {
     if (cb) cb()
   }
 
+  // ── TEMA CLARO/ESCURO ─────────────────────────────────────
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t)
+    localStorage.setItem('zp-theme', t)
+    const b = document.getElementById('theme-btn')
+    if (b) b.textContent = t === 'dark' ? '☀️' : '🌙'
+  }
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+    applyTheme(cur === 'dark' ? 'light' : 'dark')
+  }
+  function initTheme() {
+    applyTheme(localStorage.getItem('zp-theme') || 'light')
+  }
+
   return {
     badge, etClass, renderPager, notif,
     openModal, closeModal, modalClickBg,
     setLoading, acBuild, etapaSelect,
-    updateStats, setFiltro
+    updateStats, setFiltro,
+    applyTheme, toggleTheme, initTheme
   }
 })()
