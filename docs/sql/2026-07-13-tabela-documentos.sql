@@ -33,3 +33,7 @@ drop policy if exists "documentos_authenticated_all" on documentos;
 create policy "documentos_authenticated_all" on documentos
   for all to authenticated
   using (true) with check (true);
+
+-- Este projeto revoga os privilégios padrão de tabelas novas:
+-- além da policy RLS, o GRANT abaixo é obrigatório (sem ele: 42501).
+grant select, insert, update, delete on table documentos to authenticated;
