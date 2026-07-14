@@ -38,6 +38,7 @@ function nav(page) {
   if (page === 'recursos')   renderRecursos()
   if (page === 'financeiro') renderFinanceiro()
   if (page === 'suspensoes') Suspensoes.render()
+  if (page === 'calendario') Calendario.render()
   if (page === 'comercial')  Comercial.render()
   if (page === 'cadastro')   initCadastro()
   if (page === 'busca')      document.getElementById('busca-q').focus()

@@ -218,3 +218,14 @@ tbody td.bold{color:var(--text);font-weight:500}
 /* editavel inline */
 [data-edit]{cursor:text;border-bottom:1px dashed transparent}
 [data-edit]:hover{border-bottom-color:var(--gold)}
+/* CALENDARIO */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-head{margin-bottom:6px}
+.cal-dow{font-size:11px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.05em;text-align:center;padding:4px}
+.cal-cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:96px;padding:6px;cursor:pointer;overflow:hidden}
+.cal-cell:hover{border-color:var(--line-strong)}
+.cal-empty{background:transparent;border:none;cursor:default}
+.cal-today{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.15)}
+.cal-num{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.cal-evt{font-size:10.5px;padding:2px 5px;border-radius:4px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-family:var(--mono)}
+.cal-more{font-size:10px;color:var(--text3);padding:0 4px}
