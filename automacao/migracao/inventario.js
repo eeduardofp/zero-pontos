@@ -22,6 +22,9 @@ function* andar(dir) {
 // Percorre só a árvore de defesas e devolve o plano: uma linha por arquivo.
 function montarPlano(dados, raiz = SHARE) {
   const base = path.join(raiz, '1. NOVO MODELO DEFESAS ADMINISTRATIVAS')
+  // Falha ALTO se a raiz não listar: share fora do ar não pode virar
+  // silenciosamente um plano vazio (aconteceu em 2026-07-13 à noite).
+  fs.readdirSync(base)
   const linhas = []
   // índice de duplicados: docs já no cofre por (dono|nome|tamanho)
   const jaSubidos = new Set(dados.documentos.map(d =>
