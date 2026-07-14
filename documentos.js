@@ -52,8 +52,8 @@ const Documentos = (() => {
     const tipos = TIPOS[ownerKey()]
     const linhas = docs.map(d =>
       '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">' +
-        '<span class="badge b-blue" style="min-width:64px;text-align:center">' + d.tipo + '</span>' +
-        '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.nome_arquivo + '</span>' +
+        '<span class="badge b-blue" style="min-width:64px;text-align:center;cursor:pointer" title="Clique para trocar o tipo" onclick="Documentos.mudarTipo(\'' + d.id + '\',this)">' + d.tipo + '</span>' +
+        '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="Clique para renomear" onclick="Documentos.renomear(\'' + d.id + '\',this)">' + d.nome_arquivo + '</span>' +
         '<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">' + fmtTamanho(d.tamanho_bytes) + '</span>' +
         '<button class="btn btn-ghost btn-sm" onclick="Documentos.abrir(\'' + d.id + '\')">Abrir</button>' +
         '<button class="btn btn-danger btn-sm" onclick="Documentos.excluir(\'' + d.id + '\')">✕</button>' +
@@ -151,5 +151,23 @@ const Documentos = (() => {
     } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
-  return { render, upload, abrir, excluir }
+  async function renomear(docId, el) {
+    const { data } = await db().from('documentos').select('nome_arquivo').eq('id', docId).single()
+    UI.inlineEdit(el, data.nome_arquivo, async v => {
+      if (!v) return
+      const { error } = await db().from('documentos').update({ nome_arquivo: v }).eq('id', docId)
+      if (error) throw error
+      UI.notif('Documento renomeado'); render(_containerId, _owner)
+    })
+  }
+  async function mudarTipo(docId, el) {
+    const tipos = TIPOS[ownerKey()]
+    UI.inlineEdit(el, el.textContent.trim(), async v => {
+      const { error } = await db().from('documentos').update({ tipo: v }).eq('id', docId)
+      if (error) throw error
+      render(_containerId, _owner)
+    }, { tipo: 'select', opcoes: tipos })
+  }
+
+  return { render, upload, abrir, excluir, renomear, mudarTipo }
 })()

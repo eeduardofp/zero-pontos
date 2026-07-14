@@ -147,6 +147,40 @@ const UI = (() => {
     if (a) document.getElementById('tab-body').innerHTML = a.render()
   }
 
+  // ── EDIÇÃO INLINE ─────────────────────────────────────────
+  // Troca o conteúdo de `el` por um input/select; Enter/blur salva, Esc cancela.
+  // onSave(novoValor) deve persistir e retornar Promise.
+  function inlineEdit(el, valorAtual, onSave, opts) {
+    opts = opts || {}
+    const antigo = el.innerHTML
+    const inp = document.createElement(opts.tipo === 'select' ? 'select' : 'input')
+    if (opts.tipo === 'select') {
+      (opts.opcoes || []).forEach(o => { const op = document.createElement('option'); op.value = o; op.textContent = o || '—'; if (o === valorAtual) op.selected = true; inp.appendChild(op) })
+    } else {
+      inp.type = opts.tipo || 'text'
+      inp.value = valorAtual == null ? '' : valorAtual
+    }
+    inp.className = 'form-ctrl'
+    inp.style.fontSize = '13px'
+    el.innerHTML = ''
+    el.appendChild(inp)
+    inp.focus()
+    let done = false
+    const salvar = async () => {
+      if (done) return
+      done = true
+      let v = inp.value
+      if (opts.upper) v = v.toUpperCase()
+      if (opts.trim !== false) v = typeof v === 'string' ? v.trim() : v
+      try { await onSave(v) } catch (e) { UI.notif('Erro: ' + e.message, 'error'); el.innerHTML = antigo }
+    }
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') salvar()
+      if (e.key === 'Escape') { done = true; el.innerHTML = antigo }
+    })
+    inp.addEventListener('blur', salvar)
+  }
+
   // ── TEMA CLARO/ESCURO ─────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t)
@@ -168,6 +202,6 @@ const UI = (() => {
     setLoading, acBuild, etapaSelect,
     updateStats, setFiltro,
     applyTheme, toggleTheme, initTheme,
-    tabs, _tabGo
+    tabs, _tabGo, inlineEdit
   }
 })()
