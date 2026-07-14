@@ -64,7 +64,7 @@ const Documentos = (() => {
       (docs.length ? linhas : '<div style="color:var(--text3);font-size:12px;padding:4px 0">Nenhum documento anexado.</div>') +
       '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">' +
         '<select class="form-ctrl" id="doc-tipo" style="width:auto;font-size:12px">' + tipos.map(t => '<option>' + t + '</option>').join('') + '</select>' +
-        '<input type="file" id="doc-file" accept="application/pdf,image/*" style="font-size:12px;flex:1;min-width:160px">' +
+        '<input type="file" id="doc-file" style="font-size:12px;flex:1;min-width:160px">' +
         '<button class="btn btn-primary btn-sm" id="doc-up-btn" onclick="Documentos.upload()">Anexar</button>' +
       '</div>'
   }
@@ -84,7 +84,7 @@ const Documentos = (() => {
       const r2Key = PREFIXO[k] + '/' + _owner[k] + '/' + id + '.' + ext
       const resp = await fetch(WORKER_URL + '/doc?key=' + encodeURIComponent(r2Key), {
         method: 'PUT',
-        headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/pdf' },
+        headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/octet-stream' },
         body: file,
       })
       if (!resp.ok) throw new Error('upload falhou (' + resp.status + ')')
@@ -95,7 +95,7 @@ const Documentos = (() => {
         nome_arquivo: file.name,
         r2_key: r2Key,
         tamanho_bytes: file.size,
-        mime: file.type || 'application/pdf',
+        mime: file.type || 'application/octet-stream',
       })
       if (error) throw error
       UI.notif('Documento anexado!')
@@ -117,7 +117,18 @@ const Documentos = (() => {
       if (!resp.ok) throw new Error('download falhou (' + resp.status + ')')
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
+      const mime = data.mime || ''
+      // PDF e imagem abrem no navegador; o resto (Word, Excel, ...) baixa com o nome original
+      if (mime === 'application/pdf' || mime.startsWith('image/')) {
+        window.open(url, '_blank')
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.nome_arquivo || 'documento'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }

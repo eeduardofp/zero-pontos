@@ -8,6 +8,7 @@ const SUPABASE_URL = 'https://ujftnixonlscpbfhnnnr.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Q6P3CW3b7c0P1ENbvL1FFA_l60Ad-pA'
 const ALLOWED_ORIGINS = [
   'https://app.zeropontos.com.br',
+  'http://app.zeropontos.com.br', // até o certificado TLS do subdomínio ser emitido
   'https://eeduardofp.github.io',
 ]
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB por arquivo
