@@ -43,6 +43,34 @@ function nav(page) {
   if (page === 'busca')      document.getElementById('busca-q').focus()
 }
 
+// ── BUSCA GLOBAL (topbar) ─────────────────────────────────────
+function buscaGlobal(q) {
+  const box = document.getElementById('global-results'); if (!box) return
+  q = (q || '').trim().toLowerCase()
+  if (q.length < 2) { box.classList.remove('open'); box.innerHTML = ''; return }
+  const cli = Data.getClientes().filter(c => (c.nome || '').toLowerCase().includes(q) || (c.cpf || '').includes(q)).slice(0, 6)
+  const pls = Data.getPlacas().filter(p => (p.placa || '').toLowerCase().includes(q) || (p.renavan || '').includes(q)).slice(0, 6)
+  const ait = Data.getAITs().filter(a => (a.codigo || '').toLowerCase().includes(q) || (a.enquadramento || '').toLowerCase().includes(q)).slice(0, 8)
+  const sus = (typeof Suspensoes !== 'undefined' ? Suspensoes.getLista() : []).filter(s => (s.processo || '').toLowerCase().includes(q)).slice(0, 6)
+  const sec = (t, arr, fn) => arr.length ? `<div class="gr-sec">${t}</div>` + arr.map(fn).join('') : ''
+  box.innerHTML =
+    sec('Clientes', cli, c => `<div class="gr-item" onclick="openCliente('${c.id}');fecharBusca()">${c.nome}${c.cpf ? ' · ' + c.cpf : ''}</div>`) +
+    sec('Placas', pls, p => { const cl = Data.gCliente(p.cliente_id); return `<div class="gr-item" onclick="openCliente('${p.cliente_id}');fecharBusca()"><span style="font-family:var(--mono)">${p.placa}</span> · ${cl ? cl.nome : '—'}</div>` }) +
+    sec('AITs', ait, a => `<div class="gr-item" onclick="openAIT('${a.id}');fecharBusca()"><span style="font-family:var(--mono)">${a.codigo}</span> · ${a.enquadramento || '—'}</div>`) +
+    sec('Suspensões', sus, s => `<div class="gr-item" onclick="Suspensoes.abrirDetalhe('${s.id}');fecharBusca()">Proc ${s.processo || '—'}</div>`)
+    || '<div class="gr-item" style="color:var(--text3)">Nada encontrado</div>'
+  box.classList.add('open')
+}
+function fecharBusca() {
+  const b = document.getElementById('global-results'); if (b) { b.classList.remove('open'); b.innerHTML = '' }
+  const q = document.getElementById('global-q'); if (q) q.value = ''
+}
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault(); const q = document.getElementById('global-q'); if (q) q.focus()
+  }
+})
+
 // ── DASHBOARD ─────────────────────────────────────────────────
 function renderDashboard() {
   const aits = Data.getAITs()
