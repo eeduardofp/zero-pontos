@@ -62,6 +62,19 @@ test('casarClientePorNome: subconjunto de palavras casa grafias com nomes a mais
   assert.equal(M.casarClientePorNome('ANTONIO SILVA', clientes), null)
 })
 
+test('casarClientePorNome: abreviação com ponto no banco não quebra o subset', () => {
+  const clientes = [{ id: 'c1', nome: 'ANTÔNIO ROMEU S. LOPES NETO' }]
+  assert.equal(M.casarClientePorNome('ANTÔNIO ROMEU SCHEFFER LOPES NETO', clientes).id, 'c1')
+})
+
+test('casarClientePorNome: tolera 1 letra divergente (LUIS/LUIZ)', () => {
+  const clientes = [
+    { id: 'c1', nome: 'MARCIO LUIZ BORTOLINI' },
+    { id: 'c2', nome: 'RICARDO LUIZ BORTOLINI' },
+  ]
+  assert.equal(M.casarClientePorNome('MARCIO LUIS BORTOLINI. Ivanir', clientes).id, 'c1')
+})
+
 test('incluirArquivo aceita pdf/word/imagem/planilha e recusa lixo', () => {
   assert.ok(M.incluirArquivo('Defesa.doc'))
   assert.ok(M.incluirArquivo('CNH.jpeg'))

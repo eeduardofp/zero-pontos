@@ -75,18 +75,27 @@ function casarClientePorNome(pasta, clientes) {
     return n.startsWith(alvo) || alvo.startsWith(n)
   })
   if (parciais.length === 1) return parciais[0]
-  // Último nível: subconjunto de palavras (ordem livre, ignora conectivos) —
+  // Último nível: subconjunto de palavras (ordem livre, ignora conectivos e
+  // pontuação, tolera abreviação "S." e 1 letra divergente tipo LUIS/LUIZ) —
   // pega grafias com sobrenome a mais/menos ("SCHEFFER" só na pasta, etc.)
   const STOP = new Set(['DE', 'DA', 'DO', 'DOS', 'DAS', 'E'])
-  const tok = s => new Set(s.split(' ').filter(w => w.length >= 2 && !STOP.has(w)))
+  const tok = s => s.split(' ')
+    .map(w => w.replace(/[^A-Z0-9]/g, ''))
+    .filter(w => w.length >= 2 && !STOP.has(w))
+  const quaseIgual = (a, b) => {
+    if (a === b) return true
+    if (a.length !== b.length) return false
+    let dif = 0
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && ++dif > 1) return false
+    return true
+  }
   const alvoTok = tok(alvo)
   const porTokens = clientes.filter(c => {
     const nTok = tok(norm(c))
-    const menor = nTok.size <= alvoTok.size ? nTok : alvoTok
+    const menor = nTok.length <= alvoTok.length ? nTok : alvoTok
     const maior = menor === nTok ? alvoTok : nTok
-    if (menor.size < 2) return false
-    for (const w of menor) if (!maior.has(w)) return false
-    return true
+    if (menor.length < 2) return false
+    return menor.every(w => maior.some(m => quaseIgual(w, m)))
   })
   return porTokens.length === 1 ? porTokens[0] : null
 }
