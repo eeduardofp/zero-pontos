@@ -45,6 +45,23 @@ test('limparNomeCliente remove numeração e qualificadores após ponto', () => 
   assert.equal(M.limparNomeCliente('ANTÔNIO ROMEU LOPES'), 'ANTONIO ROMEU LOPES')
 })
 
+test('limparNomeCliente ignora prefixos de etapa/ano e sufixos numéricos', () => {
+  assert.equal(M.limparNomeCliente('CETRAN 2026. GABRIELI MARIA GIRARDI. 254444.2023'), 'GABRIELI MARIA GIRARDI')
+  assert.equal(M.limparNomeCliente('CETRAN. 2026. LEANDRO ALVINO PISKE. N. 97812.2021'), 'LEANDRO ALVINO PISKE')
+  assert.equal(M.limparNomeCliente('3. JARI. 2026. JOSIAS CESAR GONÇALVES'), 'JOSIAS CESAR GONCALVES')
+})
+
+test('casarClientePorNome: subconjunto de palavras casa grafias com nomes a mais/menos', () => {
+  const clientes = [
+    { id: 'c1', nome: 'ANTONIO ROMEU LOPES NETO' },
+    { id: 'c2', nome: 'MOACIR ROECKER' },
+  ]
+  // pasta traz SCHEFFER a mais — palavras do banco ⊂ palavras da pasta
+  assert.equal(M.casarClientePorNome('ANTÔNIO ROMEU SCHEFFER LOPES NETO', clientes).id, 'c1')
+  // empate ou pouco em comum continua null
+  assert.equal(M.casarClientePorNome('ANTONIO SILVA', clientes), null)
+})
+
 test('incluirArquivo aceita pdf/word/imagem/planilha e recusa lixo', () => {
   assert.ok(M.incluirArquivo('Defesa.doc'))
   assert.ok(M.incluirArquivo('CNH.jpeg'))

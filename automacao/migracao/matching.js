@@ -10,13 +10,17 @@ function semAcento(s) {
   return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
-// Nome da pasta de cliente: "12. MOACIR ROECKER" ou
-// "DANIEL OSMAR ADELINO. Balantec" → nome canônico sem numeração/apelido.
+// Nome da pasta de cliente: "12. MOACIR ROECKER", "DANIEL OSMAR ADELINO.
+// Balantec" ou "CETRAN 2026. GABRIELI MARIA GIRARDI. 254444.2023" → nome
+// canônico. Heurística: dos segmentos entre pontos, o primeiro que parece
+// nome de gente (≥2 palavras, sem dígitos); senão, o comportamento antigo.
 function limparNomeCliente(pasta) {
   let s = String(pasta || '').trim()
   s = s.replace(/^\d+\.\s*/, '')            // numeração inicial
-  s = s.split('.')[0]                        // qualificador após o primeiro ponto
-  return semAcento(s).toUpperCase().replace(/\s+/g, ' ').trim()
+  const canon = x => semAcento(x).toUpperCase().replace(/\s+/g, ' ').trim()
+  const segs = s.split('.').map(x => x.trim()).filter(Boolean)
+  const nome = segs.find(seg => !/\d/.test(seg) && canon(seg).split(' ').length >= 2)
+  return canon(nome || segs[0] || '')
 }
 
 // Caminho relativo ao share → níveis da árvore de defesas, ou null se
@@ -70,7 +74,21 @@ function casarClientePorNome(pasta, clientes) {
     const n = norm(c)
     return n.startsWith(alvo) || alvo.startsWith(n)
   })
-  return parciais.length === 1 ? parciais[0] : null
+  if (parciais.length === 1) return parciais[0]
+  // Último nível: subconjunto de palavras (ordem livre, ignora conectivos) —
+  // pega grafias com sobrenome a mais/menos ("SCHEFFER" só na pasta, etc.)
+  const STOP = new Set(['DE', 'DA', 'DO', 'DOS', 'DAS', 'E'])
+  const tok = s => new Set(s.split(' ').filter(w => w.length >= 2 && !STOP.has(w)))
+  const alvoTok = tok(alvo)
+  const porTokens = clientes.filter(c => {
+    const nTok = tok(norm(c))
+    const menor = nTok.size <= alvoTok.size ? nTok : alvoTok
+    const maior = menor === nTok ? alvoTok : nTok
+    if (menor.size < 2) return false
+    for (const w of menor) if (!maior.has(w)) return false
+    return true
+  })
+  return porTokens.length === 1 ? porTokens[0] : null
 }
 
 // Pasta de caso → AIT. Restringe às AITs do cliente casado (via placas) e
