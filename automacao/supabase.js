@@ -75,4 +75,19 @@ async function updateSuspensao(id, fields) {
   if (error) throw new Error(`Update suspensão ${id} falhou: ${error.message}`)
 }
 
-module.exports = { login, carregarAtivas, updateAIT, carregarComercial, criarOportunidade, carregarSuspensoesAtivas, updateSuspensao }
+// Migração do legado precisa de TUDO (AITs encerradas inclusive) e do
+// client para gerar o JWT dos uploads no worker.
+async function carregarTudoMigracao() {
+  const [aits, placas, clientes, suspensoes, documentos] = await Promise.all([
+    buscarTudo(client.from('aits').select('id, codigo, placa_id')),
+    buscarTudo(client.from('placas').select('id, cliente_id')),
+    buscarTudo(client.from('clientes').select('id, nome')),
+    buscarTudo(client.from('suspensoes').select('id, cliente_id, processo')),
+    buscarTudo(client.from('documentos').select('id, ait_id, cliente_id, suspensao_id, nome_arquivo, tamanho_bytes')),
+  ])
+  return { aits, placas, clientes, suspensoes, documentos }
+}
+
+function getClient() { return client }
+
+module.exports = { login, carregarAtivas, updateAIT, carregarComercial, criarOportunidade, carregarSuspensoesAtivas, updateSuspensao, carregarTudoMigracao, getClient }
