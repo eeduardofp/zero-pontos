@@ -198,5 +198,5 @@ const Documentos = (() => {
     ).join('')
   }
 
-  return { render, renderCliente, upload, abrir, excluir, renomear, mudarTipo }
+  return { render, renderCliente, upload, abrir, excluir, renomear, setTipo }
 })()
