@@ -219,6 +219,11 @@ tbody td.bold{color:var(--text);font-weight:500}
 /* editavel inline */
 [data-edit]{cursor:text;border-bottom:1px dashed transparent}
 [data-edit]:hover{border-bottom-color:var(--gold)}
+/* DOCUMENTOS */
+.doc-tipo-sel{min-width:96px;padding:3px 6px;font-size:11px;font-family:var(--mono);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:6px;color:var(--text);cursor:pointer}
+.doc-tipo-sel:focus{outline:none;border-color:var(--gold)}
+.doc-act{cursor:pointer;color:var(--text3);font-size:13px;padding:2px 6px;border-radius:4px}
+.doc-act:hover{color:var(--gold);background:var(--surface-2)}
 /* CALENDARIO */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .cal-head{margin-bottom:6px}

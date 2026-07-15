@@ -50,15 +50,19 @@ const Documentos = (() => {
     catch (e) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Erro ao listar: ' + e.message + '</div>'; return }
 
     const tipos = TIPOS[ownerKey()]
-    const linhas = docs.map(d =>
-      '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">' +
-        '<span class="badge b-blue" style="min-width:64px;text-align:center;cursor:pointer" title="Clique para trocar o tipo" onclick="Documentos.mudarTipo(\'' + d.id + '\',this)">' + d.tipo + '</span>' +
-        '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="Clique para renomear" onclick="Documentos.renomear(\'' + d.id + '\',this)">' + d.nome_arquivo + '</span>' +
+    const esc = s => String(s || '').replace(/'/g, '\\u0027').replace(/"/g, '&quot;')
+    const linhas = docs.map(d => {
+      const lista = tipos.includes(d.tipo) ? tipos : [d.tipo].concat(tipos)
+      const opts = lista.map(t => `<option${t === d.tipo ? ' selected' : ''}>${t}</option>`).join('')
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        '<select class="doc-tipo-sel" onchange="Documentos.setTipo(\'' + d.id + '\',this.value)" title="Tipo do documento">' + opts + '</select>' +
+        '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.nome_arquivo + '</span>' +
+        '<span class="doc-act" title="Renomear" onclick="Documentos.renomear(\'' + d.id + '\',\'' + esc(d.nome_arquivo) + '\')">✎</span>' +
         '<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">' + fmtTamanho(d.tamanho_bytes) + '</span>' +
         '<button class="btn btn-ghost btn-sm" onclick="Documentos.abrir(\'' + d.id + '\')">Abrir</button>' +
         '<button class="btn btn-danger btn-sm" onclick="Documentos.excluir(\'' + d.id + '\')">✕</button>' +
       '</div>'
-    ).join('')
+    }).join('')
 
     el.innerHTML =
       (docs.length ? linhas : '<div style="color:var(--text3);font-size:12px;padding:4px 0">Nenhum documento anexado.</div>') +
@@ -158,22 +162,23 @@ const Documentos = (() => {
     } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
-  async function renomear(docId, el) {
-    const { data } = await db().from('documentos').select('nome_arquivo').eq('id', docId).single()
-    UI.inlineEdit(el, data.nome_arquivo, async v => {
-      if (!v) return
+  async function setTipo(docId, valor) {
+    try {
+      const { error } = await db().from('documentos').update({ tipo: valor }).eq('id', docId)
+      if (error) throw error
+      UI.notif('Tipo atualizado')
+    } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
+  }
+  async function renomear(docId, nomeAtual) {
+    const novo = prompt('Novo nome do documento:', nomeAtual || '')
+    if (novo == null) return
+    const v = novo.trim()
+    if (!v || v === nomeAtual) return
+    try {
       const { error } = await db().from('documentos').update({ nome_arquivo: v }).eq('id', docId)
       if (error) throw error
       UI.notif('Documento renomeado'); render(_containerId, _owner)
-    })
-  }
-  async function mudarTipo(docId, el) {
-    const tipos = TIPOS[ownerKey()]
-    UI.inlineEdit(el, el.textContent.trim(), async v => {
-      const { error } = await db().from('documentos').update({ tipo: v }).eq('id', docId)
-      if (error) throw error
-      render(_containerId, _owner)
-    }, { tipo: 'select', opcoes: tipos })
+    } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
   // Lista SÓ-LEITURA dos documentos de um cliente (usada dentro de AIT/suspensão
