@@ -81,21 +81,16 @@ const Documentos = (() => {
       '<div style="font-size:11px;color:var(--text3);margin-top:4px">Escolha um ou vários arquivos. Sobem como “Outro” — depois clique no tipo de cada um pra ajustar.</div>'
   }
 
-  async function upload() {
-    const input = document.getElementById('doc-file')
-    const files = input && input.files ? Array.from(input.files) : []
-    if (!files.length) { UI.notif('Escolha um ou mais arquivos', 'error'); return }
-    const btn = document.getElementById('doc-up-btn')
-    btn.disabled = true
+  // Sobe uma lista de arquivos para o dono (col=ait_id|cliente_id|suspensao_id, id).
+  async function subirArquivos(files, col, ownerId, btn) {
     const t = await token()
-    const k = ownerKey()
     let ok = 0, falhas = 0
     for (const file of files) {
-      btn.textContent = `Enviando ${ok + falhas + 1}/${files.length}…`
+      if (btn) btn.textContent = `Enviando ${ok + falhas + 1}/${files.length}…`
       try {
         const id = Data.genId('d')
         const ext = (file.name.split('.').pop() || 'pdf').toLowerCase()
-        const r2Key = PREFIXO[k] + '/' + _owner[k] + '/' + id + '.' + ext
+        const r2Key = PREFIXO[col] + '/' + ownerId + '/' + id + '.' + ext
         const resp = await fetch(WORKER_URL + '/doc?key=' + encodeURIComponent(r2Key), {
           method: 'PUT',
           headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/octet-stream' },
@@ -103,7 +98,7 @@ const Documentos = (() => {
         })
         if (!resp.ok) throw new Error('worker ' + resp.status)
         const { error } = await db().from('documentos').insert({
-          id, [k]: _owner[k], tipo: 'Outro',
+          id, [col]: ownerId, tipo: 'Outro',
           nome_arquivo: file.name, r2_key: r2Key,
           tamanho_bytes: file.size, mime: file.type || 'application/octet-stream',
         })
@@ -112,7 +107,26 @@ const Documentos = (() => {
       } catch (e) { falhas++; console.error('upload', file.name, e.message) }
     }
     UI.notif(ok + ' anexado(s)' + (falhas ? ', ' + falhas + ' falharam' : '') + '. Ajuste o tipo de cada um.')
-    render(_containerId, _owner)
+    return { ok, falhas }
+  }
+
+  async function upload() {
+    const input = document.getElementById('doc-file')
+    const files = input && input.files ? Array.from(input.files) : []
+    if (!files.length) { UI.notif('Escolha um ou mais arquivos', 'error'); return }
+    const btn = document.getElementById('doc-up-btn'); if (btn) btn.disabled = true
+    await subirArquivos(files, ownerKey(), _owner[ownerKey()], btn)
+    refreshTudo()
+  }
+
+  // Upload para o CLIENTE (titular) a partir da seção "Documentos do titular".
+  async function uploadCliente(clienteId) {
+    const input = document.getElementById('doc-file-cli')
+    const files = input && input.files ? Array.from(input.files) : []
+    if (!files.length) { UI.notif('Escolha um ou mais arquivos', 'error'); return }
+    const btn = document.getElementById('doc-up-cli-btn'); if (btn) btn.disabled = true
+    await subirArquivos(files, 'cliente_id', clienteId, btn)
+    refreshTudo()
   }
 
   // Tipo inferido pela extensão do nome (a migração gravou mime genérico)
@@ -197,10 +211,9 @@ const Documentos = (() => {
     _cliRef = { containerId, clienteId }
     const { data, error } = await db().from('documentos').select('*').eq('cliente_id', clienteId).order('created_at')
     if (error) { el.innerHTML = ''; return }
-    if (!data.length) { el.innerHTML = '<div style="color:var(--text3);font-size:12px">Nenhum documento no cadastro do titular.</div>'; return }
     const tipos = TIPOS.cliente_id
     const esc = s => String(s || '').replace(/'/g, '\\u0027').replace(/"/g, '&quot;')
-    el.innerHTML = data.map(d => {
+    const linhas = data.map(d => {
       const lista = tipos.includes(d.tipo) ? tipos : [d.tipo].concat(tipos)
       const opts = lista.map(t => `<option${t === d.tipo ? ' selected' : ''}>${t}</option>`).join('')
       return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
@@ -208,9 +221,16 @@ const Documentos = (() => {
         '<span style="flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.nome_arquivo + '</span>' +
         '<span class="doc-act" title="Renomear" onclick="Documentos.renomear(\'' + d.id + '\',\'' + esc(d.nome_arquivo) + '\')">✎</span>' +
         '<button class="btn btn-ghost btn-sm" onclick="Documentos.abrir(\'' + d.id + '\')">Abrir</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="Documentos.excluir(\'' + d.id + '\')">✕</button>' +
       '</div>'
     }).join('')
+    el.innerHTML =
+      (data.length ? linhas : '<div style="color:var(--text3);font-size:12px;padding:4px 0">Nenhum documento no cadastro do titular.</div>') +
+      '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">' +
+        '<input type="file" id="doc-file-cli" multiple style="font-size:12px;flex:1;min-width:160px">' +
+        '<button class="btn btn-primary btn-sm" id="doc-up-cli-btn" onclick="Documentos.uploadCliente(\'' + clienteId + '\')">Anexar ao titular</button>' +
+      '</div>'
   }
 
-  return { render, renderCliente, upload, abrir, excluir, renomear, setTipo }
+  return { render, renderCliente, upload, uploadCliente, abrir, excluir, renomear, setTipo }
 })()
