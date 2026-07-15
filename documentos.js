@@ -12,6 +12,13 @@ const Documentos = (() => {
 
   let _owner = null        // { ait_id: id } | { cliente_id: id } | { suspensao_id: id }
   let _containerId = null
+  let _cliRef = null       // { containerId, clienteId } da lista de docs do titular
+
+  // Re-renderiza o que estiver aberto (lista principal e/ou docs do titular).
+  function refreshTudo() {
+    if (_owner && _containerId) render(_containerId, _owner)
+    if (_cliRef) renderCliente(_cliRef.containerId, _cliRef.clienteId)
+  }
 
   function db() { return Auth.getClient() }
   function ownerKey() { return Object.keys(_owner)[0] }
@@ -38,6 +45,7 @@ const Documentos = (() => {
   async function render(containerId, owner) {
     _owner = owner
     _containerId = containerId
+    _cliRef = null
     const el = document.getElementById(containerId)
     if (!el) return
     if (!WORKER_URL) {
@@ -158,7 +166,7 @@ const Documentos = (() => {
       const { error: e2 } = await db().from('documentos').delete().eq('id', docId)
       if (e2) throw e2
       UI.notif('Documento excluído')
-      render(_containerId, _owner)
+      refreshTudo()
     } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
@@ -177,25 +185,31 @@ const Documentos = (() => {
     try {
       const { error } = await db().from('documentos').update({ nome_arquivo: v }).eq('id', docId)
       if (error) throw error
-      UI.notif('Documento renomeado'); render(_containerId, _owner)
+      UI.notif('Documento renomeado'); refreshTudo()
     } catch (e) { UI.notif('Erro: ' + e.message, 'error') }
   }
 
-  // Lista SÓ-LEITURA dos documentos de um cliente (usada dentro de AIT/suspensão
-  // para dar acesso aos docs do titular no mesmo lugar). Não mexe no _owner.
+  // Documentos do titular (cliente) mostrados dentro de AIT/suspensão.
+  // Editáveis (renomear/tipo) igual à lista principal — não mexe no _owner.
   async function renderCliente(containerId, clienteId) {
     const el = document.getElementById(containerId)
     if (!el || !WORKER_URL) return
+    _cliRef = { containerId, clienteId }
     const { data, error } = await db().from('documentos').select('*').eq('cliente_id', clienteId).order('created_at')
     if (error) { el.innerHTML = ''; return }
     if (!data.length) { el.innerHTML = '<div style="color:var(--text3);font-size:12px">Nenhum documento no cadastro do titular.</div>'; return }
-    el.innerHTML = data.map(d =>
-      '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">' +
-        '<span class="badge b-na" style="min-width:64px;text-align:center">' + d.tipo + '</span>' +
+    const tipos = TIPOS.cliente_id
+    const esc = s => String(s || '').replace(/'/g, '\\u0027').replace(/"/g, '&quot;')
+    el.innerHTML = data.map(d => {
+      const lista = tipos.includes(d.tipo) ? tipos : [d.tipo].concat(tipos)
+      const opts = lista.map(t => `<option${t === d.tipo ? ' selected' : ''}>${t}</option>`).join('')
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+        '<select class="doc-tipo-sel" onchange="Documentos.setTipo(\'' + d.id + '\',this.value)" title="Tipo do documento">' + opts + '</select>' +
         '<span style="flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.nome_arquivo + '</span>' +
+        '<span class="doc-act" title="Renomear" onclick="Documentos.renomear(\'' + d.id + '\',\'' + esc(d.nome_arquivo) + '\')">✎</span>' +
         '<button class="btn btn-ghost btn-sm" onclick="Documentos.abrir(\'' + d.id + '\')">Abrir</button>' +
       '</div>'
-    ).join('')
+    }).join('')
   }
 
   return { render, renderCliente, upload, abrir, excluir, renomear, setTipo }
