@@ -1,0 +1,5 @@
+
+# dados de cliente (PII) — nunca versionar
+automacao/migracao/plano-migracao*.csv
+automacao/logs/
+automacao/chrome-profile/

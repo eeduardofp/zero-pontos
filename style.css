@@ -19,10 +19,11 @@
 :root[data-theme="dark"]{
   --navy-900:#070F18;--navy-800:#0C1826;--navy-700:#16283C;--navy-600:#22405E;
   --sidebar-bg:var(--navy-900);
+  --gold-soft:#2E2714;
   --bg:#0B1420;--surface:#111C2B;--surface-2:#16273A;
   --bg2:var(--surface);--bg3:var(--surface-2);
   --border:#1E2E42;--line:#1E2E42;--border2:#2C3F58;--line-strong:#2C3F58;
-  --text:#E7ECF3;--text2:#9AA7B8;--text3:#5F6E82;
+  --text:#E7ECF3;--text2:#AEBACB;--text3:#8595AB;
   --blue:#7FB3C4;--blue2:#5F94A6;--blue-bg:#16283C;
   --green:#5FBE86;--green-bg:#123123;
   --amber:#D9A85D;--amber-bg:#33280F;

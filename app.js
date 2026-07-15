@@ -877,7 +877,10 @@ function openAIT(aid) {
       field('Protocolo', a.protocolo, true) + field('Senha', a.senha, true) +
       field('Última atualização', (a.ultima_att || '—') + (da < 999 ? ` (${da}d atrás)` : '')) +
       field('Observações', a.observacao) + '</div>' },
-    { id: 'docs', label: 'Documentos', render: () => { setTimeout(() => Documentos.render('docs-box', { ait_id: aid }), 0); return '<div id="docs-box"></div>' } },
+    { id: 'docs', label: 'Documentos', render: () => {
+      setTimeout(() => { Documentos.render('docs-box', { ait_id: aid }); if (cl) Documentos.renderCliente('docs-box-cli-ref', cl.id) }, 0)
+      return '<div id="docs-box"></div>' + (cl ? '<div class="section-title" style="margin-top:18px">📎 Documentos do titular</div><div id="docs-box-cli-ref"></div>' : '')
+    } },
     { id: 'prazos', label: 'Prazos & histórico', render: () =>
       '<div class="field-grid">' + field('Vencimento do recurso', Data.fmtData(a.vencimento)) + field('Próxima etapa', Data.proximaEtapa(a) || '—') +
       field('Última atualização', a.ultima_att) + field('Data da venda', Data.fmtData(a.data_venda)) + '</div>' },

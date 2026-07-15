@@ -57,8 +57,15 @@ const UI = (() => {
     document.getElementById('modal-body').innerHTML = ''
   }
 
+  // Só fecha se o clique COMEÇOU no fundo (evita fechar ao soltar o mouse no
+  // fundo depois de interagir com select/input dentro do modal).
+  let _downOnBg = false
+  function modalMouseDown(e) {
+    _downOnBg = e.target === document.getElementById('modal')
+  }
   function modalClickBg(e) {
-    if (e.target === document.getElementById('modal')) closeModal()
+    if (_downOnBg && e.target === document.getElementById('modal')) closeModal()
+    _downOnBg = false
   }
 
   // ── LOADING ───────────────────────────────────────────────
@@ -198,7 +205,7 @@ const UI = (() => {
 
   return {
     badge, etClass, renderPager, notif,
-    openModal, closeModal, modalClickBg,
+    openModal, closeModal, modalClickBg, modalMouseDown,
     setLoading, acBuild, etapaSelect,
     updateStats, setFiltro,
     applyTheme, toggleTheme, initTheme,

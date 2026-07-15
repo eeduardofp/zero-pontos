@@ -316,7 +316,10 @@ const Suspensoes = (() => {
         '<div class="field-grid" style="margin-top:4px">' + fld('Protocolo', s.protocolo, true) + fld('Senha', s.senha, true) +
         fld('Etapa atual', et) + fld('Última atualização', (s.ultima_att || '—') + (da !== null ? ' (' + (da === 0 ? 'hoje' : da + 'd atrás') + ')' : '')) +
         fld('Observações', s.observacao) + '</div>' },
-      { id: 'docs', label: 'Documentos', render: () => { setTimeout(() => Documentos.render('docs-box-sus', { suspensao_id: id }), 0); return '<div id="docs-box-sus"></div>' } },
+      { id: 'docs', label: 'Documentos', render: () => {
+        setTimeout(() => { Documentos.render('docs-box-sus', { suspensao_id: id }); if (s.cliente_id) Documentos.renderCliente('docs-box-sus-cli', s.cliente_id) }, 0)
+        return '<div id="docs-box-sus"></div>' + (s.cliente_id ? '<div class="section-title" style="margin-top:18px">📎 Documentos do titular</div><div id="docs-box-sus-cli"></div>' : '')
+      } },
       { id: 'prazos', label: 'Prazos', render: () => '<div class="field-grid">' + fld('Vencimento JARI', s.vencimento_jari ? Data.fmtData(s.vencimento_jari) : '—') + fld('Vencimento CETRAN', s.vencimento_cetran ? Data.fmtData(s.vencimento_cetran) : '—') + fld('Próxima etapa', proximaEtapa(s) || '—') + '</div>' },
       { id: 'editar', label: 'Editar', render: () => {
         setTimeout(() => { const b = document.getElementById('sus-save-btn'); if (b) b.onclick = () => salvarEdicao(id) }, 0)

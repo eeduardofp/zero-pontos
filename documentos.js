@@ -63,47 +63,52 @@ const Documentos = (() => {
     el.innerHTML =
       (docs.length ? linhas : '<div style="color:var(--text3);font-size:12px;padding:4px 0">Nenhum documento anexado.</div>') +
       '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">' +
-        '<select class="form-ctrl" id="doc-tipo" style="width:auto;font-size:12px">' + tipos.map(t => '<option>' + t + '</option>').join('') + '</select>' +
-        '<input type="file" id="doc-file" style="font-size:12px;flex:1;min-width:160px">' +
+        '<input type="file" id="doc-file" multiple style="font-size:12px;flex:1;min-width:160px">' +
         '<button class="btn btn-primary btn-sm" id="doc-up-btn" onclick="Documentos.upload()">Anexar</button>' +
-      '</div>'
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:4px">Escolha um ou vários arquivos. Sobem como “Outro” — depois clique no tipo de cada um pra ajustar.</div>'
   }
 
   async function upload() {
     const input = document.getElementById('doc-file')
-    const file = input && input.files[0]
-    if (!file) { UI.notif('Escolha um arquivo', 'error'); return }
-    const tipo = document.getElementById('doc-tipo').value
+    const files = input && input.files ? Array.from(input.files) : []
+    if (!files.length) { UI.notif('Escolha um ou mais arquivos', 'error'); return }
     const btn = document.getElementById('doc-up-btn')
-    btn.disabled = true; btn.textContent = 'Enviando…'
-    try {
-      const t = await token()
-      const k = ownerKey()
-      const id = Data.genId('d')
-      const ext = (file.name.split('.').pop() || 'pdf').toLowerCase()
-      const r2Key = PREFIXO[k] + '/' + _owner[k] + '/' + id + '.' + ext
-      const resp = await fetch(WORKER_URL + '/doc?key=' + encodeURIComponent(r2Key), {
-        method: 'PUT',
-        headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      })
-      if (!resp.ok) throw new Error('upload falhou (' + resp.status + ')')
-      const { error } = await db().from('documentos').insert({
-        id: id,
-        [k]: _owner[k],
-        tipo: tipo,
-        nome_arquivo: file.name,
-        r2_key: r2Key,
-        tamanho_bytes: file.size,
-        mime: file.type || 'application/octet-stream',
-      })
-      if (error) throw error
-      UI.notif('Documento anexado!')
-      render(_containerId, _owner)
-    } catch (e) {
-      UI.notif('Erro: ' + e.message, 'error')
-      btn.disabled = false; btn.textContent = 'Anexar'
+    btn.disabled = true
+    const t = await token()
+    const k = ownerKey()
+    let ok = 0, falhas = 0
+    for (const file of files) {
+      btn.textContent = `Enviando ${ok + falhas + 1}/${files.length}…`
+      try {
+        const id = Data.genId('d')
+        const ext = (file.name.split('.').pop() || 'pdf').toLowerCase()
+        const r2Key = PREFIXO[k] + '/' + _owner[k] + '/' + id + '.' + ext
+        const resp = await fetch(WORKER_URL + '/doc?key=' + encodeURIComponent(r2Key), {
+          method: 'PUT',
+          headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!resp.ok) throw new Error('worker ' + resp.status)
+        const { error } = await db().from('documentos').insert({
+          id, [k]: _owner[k], tipo: 'Outro',
+          nome_arquivo: file.name, r2_key: r2Key,
+          tamanho_bytes: file.size, mime: file.type || 'application/octet-stream',
+        })
+        if (error) throw error
+        ok++
+      } catch (e) { falhas++; console.error('upload', file.name, e.message) }
     }
+    UI.notif(ok + ' anexado(s)' + (falhas ? ', ' + falhas + ' falharam' : '') + '. Ajuste o tipo de cada um.')
+    render(_containerId, _owner)
+  }
+
+  // Tipo inferido pela extensão do nome (a migração gravou mime genérico)
+  function tipoMime(nome) {
+    const ext = (nome.split('.').pop() || '').toLowerCase()
+    if (ext === 'pdf') return 'application/pdf'
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image/' + (ext === 'jpg' ? 'jpeg' : ext)
+    return ''
   }
 
   async function abrir(docId) {
@@ -115,9 +120,11 @@ const Documentos = (() => {
         headers: { Authorization: 'Bearer ' + t },
       })
       if (!resp.ok) throw new Error('download falhou (' + resp.status + ')')
-      const blob = await resp.blob()
+      const rawBlob = await resp.blob()
+      // A migração gravou mime genérico; inferimos pela extensão do nome.
+      const mime = tipoMime(data.nome_arquivo) || data.mime || ''
+      const blob = mime ? rawBlob.slice(0, rawBlob.size, mime) : rawBlob
       const url = URL.createObjectURL(blob)
-      const mime = data.mime || ''
       // PDF e imagem abrem no navegador; o resto (Word, Excel, ...) baixa com o nome original
       if (mime === 'application/pdf' || mime.startsWith('image/')) {
         window.open(url, '_blank')
@@ -169,5 +176,22 @@ const Documentos = (() => {
     }, { tipo: 'select', opcoes: tipos })
   }
 
-  return { render, upload, abrir, excluir, renomear, mudarTipo }
+  // Lista SÓ-LEITURA dos documentos de um cliente (usada dentro de AIT/suspensão
+  // para dar acesso aos docs do titular no mesmo lugar). Não mexe no _owner.
+  async function renderCliente(containerId, clienteId) {
+    const el = document.getElementById(containerId)
+    if (!el || !WORKER_URL) return
+    const { data, error } = await db().from('documentos').select('*').eq('cliente_id', clienteId).order('created_at')
+    if (error) { el.innerHTML = ''; return }
+    if (!data.length) { el.innerHTML = '<div style="color:var(--text3);font-size:12px">Nenhum documento no cadastro do titular.</div>'; return }
+    el.innerHTML = data.map(d =>
+      '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+        '<span class="badge b-na" style="min-width:64px;text-align:center">' + d.tipo + '</span>' +
+        '<span style="flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.nome_arquivo + '</span>' +
+        '<button class="btn btn-ghost btn-sm" onclick="Documentos.abrir(\'' + d.id + '\')">Abrir</button>' +
+      '</div>'
+    ).join('')
+  }
+
+  return { render, renderCliente, upload, abrir, excluir, renomear, mudarTipo }
 })()
