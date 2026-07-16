@@ -320,7 +320,7 @@ const Suspensoes = (() => {
         setTimeout(() => { Documentos.render('docs-box-sus', { suspensao_id: id }); if (s.cliente_id) Documentos.renderCliente('docs-box-sus-cli', s.cliente_id) }, 0)
         return '<div id="docs-box-sus"></div>' + (s.cliente_id ? '<div class="section-title" style="margin-top:18px">📎 Documentos do titular</div><div id="docs-box-sus-cli"></div>' : '')
       } },
-      { id: 'prazos', label: 'Prazos', render: () => '<div class="field-grid">' + fld('Vencimento JARI', s.vencimento_jari ? Data.fmtData(s.vencimento_jari) : '—') + fld('Vencimento CETRAN', s.vencimento_cetran ? Data.fmtData(s.vencimento_cetran) : '—') + fld('Próxima etapa', proximaEtapa(s) || '—') + '</div>' },
+      { id: 'prazos', label: 'Prazos', render: () => '<div class="field-grid">' + fld('Vencimento Defesa Prévia', s.vencimento_defesa_previa ? Data.fmtData(s.vencimento_defesa_previa) : '—') + fld('Vencimento JARI', s.vencimento_jari ? Data.fmtData(s.vencimento_jari) : '—') + fld('Vencimento CETRAN', s.vencimento_cetran ? Data.fmtData(s.vencimento_cetran) : '—') + fld('Próxima etapa', proximaEtapa(s) || '—') + '</div>' },
       { id: 'editar', label: 'Editar', render: () => {
         setTimeout(() => { const b = document.getElementById('sus-save-btn'); if (b) b.onclick = () => salvarEdicao(id) }, 0)
         return '<div class="form-row" style="margin-bottom:8px">' +
@@ -334,8 +334,10 @@ const Suspensoes = (() => {
           '<div><label class="form-label">JARI</label><select class="form-ctrl" id="sus-ed-jari">' + selOpts('jari') + '</select></div>' +
           '<div><label class="form-label">CETRAN</label><select class="form-ctrl" id="sus-ed-cetran">' + selOpts('cetran') + '</select></div></div>' +
           '<div class="form-row3" style="margin-bottom:8px">' +
+          '<div><label class="form-label">Venc. Defesa Prévia</label><input type="date" class="form-ctrl" id="sus-ed-vdef" value="' + (s.vencimento_defesa_previa || '') + '"></div>' +
           '<div><label class="form-label">Vencimento JARI</label><input type="date" class="form-ctrl" id="sus-ed-vjari" value="' + (s.vencimento_jari || '') + '"></div>' +
-          '<div><label class="form-label">Vencimento CETRAN</label><input type="date" class="form-ctrl" id="sus-ed-vcetran" value="' + (s.vencimento_cetran || '') + '"></div>' +
+          '<div><label class="form-label">Vencimento CETRAN</label><input type="date" class="form-ctrl" id="sus-ed-vcetran" value="' + (s.vencimento_cetran || '') + '"></div></div>' +
+          '<div class="form-row" style="margin-bottom:8px">' +
           '<div><label class="form-label">Observação</label><input class="form-ctrl" id="sus-ed-obs" value="' + (s.observacao || '') + '"></div></div>' +
           '<button class="btn btn-primary" id="sus-save-btn">Salvar alterações</button>'
       } }
@@ -353,6 +355,7 @@ const Suspensoes = (() => {
       defesa_previa:    document.getElementById('sus-ed-def').value || s.defesa_previa,
       jari:             document.getElementById('sus-ed-jari').value || s.jari,
       cetran:           document.getElementById('sus-ed-cetran').value || s.cetran,
+      vencimento_defesa_previa: document.getElementById('sus-ed-vdef').value || null,
       vencimento_jari:  document.getElementById('sus-ed-vjari').value || null,
       vencimento_cetran:document.getElementById('sus-ed-vcetran').value || null,
       observacao:       document.getElementById('sus-ed-obs').value,
