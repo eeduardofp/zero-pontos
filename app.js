@@ -361,12 +361,22 @@ function renderKanban() {
 }
 
 // ── RECURSOS ──────────────────────────────────────────────────
-async function renderRecursos() {
-  // Suspensões é uma página separada — se o usuário nunca abriu "Suspensões"
-  // o cache dela está vazio. Garante que está carregado antes de montar a fila.
-  await Suspensoes.garantirCarregado()
+function getIgnorados() {
+  try { return JSON.parse(localStorage.getItem('zp-ignorados') || '[]') } catch { return [] }
+}
+function ignorarRecurso(tipo, id) {
+  const ig = getIgnorados()
+  const key = tipo + ':' + id
+  if (!ig.includes(key)) ig.push(key)
+  localStorage.setItem('zp-ignorados', JSON.stringify(ig))
+  renderRecursos()
+}
 
-  const aitItens = Data.getAITs().filter(Data.precisaRecurso).map(a => {
+async function renderRecursos() {
+  await Suspensoes.garantirCarregado()
+  const ignorados = new Set(getIgnorados())
+
+  const aitItens = Data.getAITs().filter(Data.precisaRecurso).filter(a => !ignorados.has('ait:' + a.id)).map(a => {
     const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
     return {
       tipo: 'ait', id: a.id,
@@ -377,7 +387,7 @@ async function renderRecursos() {
     }
   })
 
-  const susItens = Suspensoes.getLista().filter(Suspensoes.precisaRecurso).map(s => {
+  const susItens = Suspensoes.getLista().filter(Suspensoes.precisaRecurso).filter(s => !ignorados.has('suspensao:' + s.id)).map(s => {
     const cl = Data.gCliente(s.cliente_id)
     const prox = Suspensoes.proximaEtapa(s)
     return {
@@ -408,7 +418,7 @@ async function renderRecursos() {
       <td><span class="badge b-blue">${item.prox}</span></td>
       <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">${item.prazo || '—'}</td>
       <td><span class="badge ${u.c}">${u.t}</span></td>
-      <td><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button></td></tr>`
+      <td style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button><button class="btn btn-ghost btn-sm" onclick="ignorarRecurso('${item.tipo}','${item.id}')">Ignorar</button></td></tr>`
   }).join('') : '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3)">Nenhum recurso pendente</td></tr>'
 }
 
