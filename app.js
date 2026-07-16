@@ -1048,8 +1048,9 @@ async function confirmarRecurso(aid, etKey) {
 function openRecursoSus(sid) {
   const s = Suspensoes.getById(sid); if (!s) return
   const cl = Data.gCliente(s.cliente_id)
-  const prox = Suspensoes.proximaEtapa(s), ant = prox === 'JARI' ? 'Defesa Prévia' : 'JARI'
-  const etKey = prox === 'JARI' ? 'jari' : 'cetran'
+  const prox = Suspensoes.proximaEtapa(s)
+  const ant = prox === 'Defesa Prévia' ? '—' : prox === 'JARI' ? 'Defesa Prévia' : 'JARI'
+  const etKey = prox === 'Defesa Prévia' ? 'defesa_previa' : prox === 'JARI' ? 'jari' : 'cetran'
   UI.openModal(
     `<div class="modal-title">Protocolar recurso — Suspensão de CNH</div>
     <div class="modal-sub">${cl ? cl.nome : '—'} · Processo ${s.processo || '—'}</div>

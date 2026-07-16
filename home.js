@@ -27,7 +27,8 @@ const Home = (() => {
     })
     susList.filter(Suspensoes.precisaRecurso).forEach(s => {
       const cl = Data.gCliente(s.cliente_id), prox = Suspensoes.proximaEtapa(s)
-      itens.push({ tipo: 'sus', id: s.id, cliente: cl ? cl.nome : '—', cod: 'Proc ' + (s.processo || '—'), etapa: prox, prazo: prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran })
+      const prazoSus = prox === 'Defesa Prévia' ? s.vencimento_defesa_previa : prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
+      itens.push({ tipo: 'sus', id: s.id, cliente: cl ? cl.nome : '—', cod: 'Proc ' + (s.processo || '—'), etapa: prox, prazo: prazoSus })
     })
 
     const grupos = [[], [], [], []]

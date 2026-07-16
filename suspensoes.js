@@ -83,16 +83,20 @@ const Suspensoes = (() => {
   // do site — não faz sentido cobrar protocolo sem prazo real).
   function precisaRecurso(s) {
     if (s.encerrado) return false
+    const defVaz = !s.defesa_previa || s.defesa_previa === 'Não realizado' || s.defesa_previa === 'Aguardando'
     const defInd = s.defesa_previa === 'Indeferido'
     const jariVaz = !s.jari || s.jari === 'Não realizado'
     const jariInd = s.jari === 'Indeferido'
     const cetranVaz = !s.cetran || s.cetran === 'Não realizado'
+    if (defVaz) return !!s.vencimento_defesa_previa
     if (defInd && jariVaz) return !!s.vencimento_jari
     if (jariInd && cetranVaz) return !!s.vencimento_cetran
     return false
   }
 
   function proximaEtapa(s) {
+    const defVaz = !s.defesa_previa || s.defesa_previa === 'Não realizado' || s.defesa_previa === 'Aguardando'
+    if (defVaz && s.vencimento_defesa_previa) return 'Defesa Prévia'
     if (s.defesa_previa === 'Indeferido' && (!s.jari || s.jari === 'Não realizado')) return 'JARI'
     if (s.jari === 'Indeferido' && (!s.cetran || s.cetran === 'Não realizado')) return 'CETRAN'
     return null
@@ -135,8 +139,8 @@ const Suspensoes = (() => {
   }
 
   function vencimentoAtual(s) {
-    // Retorna o vencimento mais relevante baseado na etapa atual
     const et = etapaAtual(s)
+    if (et === 'Defesa Prévia' && s.vencimento_defesa_previa) return s.vencimento_defesa_previa
     if (et === 'CETRAN' && s.vencimento_cetran) return s.vencimento_cetran
     if (et === 'JARI' && s.vencimento_jari) return s.vencimento_jari
     if (s.vencimento_cetran) return s.vencimento_cetran
@@ -374,7 +378,7 @@ const Suspensoes = (() => {
   // vencimento correspondente (JARI ou CETRAN, conforme etKey).
   async function confirmarRecurso(id, etKey) {
     const s = gSus(id); if (!s) return
-    const vencKey = etKey === 'jari' ? 'vencimento_jari' : 'vencimento_cetran'
+    const vencKey = etKey === 'jari' ? 'vencimento_jari' : etKey === 'cetran' ? 'vencimento_cetran' : 'vencimento_defesa_previa'
     const fields = { [etKey]: 'Aguardando', [vencKey]: null, ultima_att: Data.today() }
     try {
       await updateSuspensao(id, fields)
