@@ -160,7 +160,7 @@ function doBusca() {
     ).slice(0, 12)
     if (as.length) {
       html += `<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:6px${html ? ';margin-top:16px' : ''}">AITs</div>`
-      html += `<div class="tbl-wrap"><table style="table-layout:fixed"><thead><tr><th style="width:30%">AIT</th><th>Cliente</th><th>Placa</th><th style="width:110px">Etapa</th><th style="width:100px">Status</th></tr></thead><tbody>`
+      html += `<div class="tbl-wrap"><table style="table-layout:fixed"><thead><tr><th style="width:28%">AIT</th><th>Cliente</th><th style="width:90px">Placa</th><th style="width:110px">Etapa</th><th style="width:100px">Status</th><th style="width:70px">Ano</th></tr></thead><tbody>`
       as.forEach(a => {
         const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
         html += `<tr onclick="openAIT('${a.id}')">
@@ -168,7 +168,8 @@ function doBusca() {
           <td>${cl ? cl.nome.slice(0, 18) : '—'}</td>
           <td style="font-family:var(--mono)">${pl ? pl.placa : '—'}</td>
           <td style="font-size:12px">${Data.etapaAtual(a)}</td>
-          <td>${UI.badge(Data.statusAtual(a))}</td></tr>`
+          <td>${UI.badge(Data.statusAtual(a))}</td>
+          <td style="font-family:var(--mono);color:var(--text3);white-space:nowrap">${a.ano || '—'}</td></tr>`
       })
       html += '</tbody></table></div>'
     } else if (q.length > 6) {
@@ -232,7 +233,7 @@ function renderAITs(p) {
       <td style="font-size:12px;color:var(--text3)">${(a.enquadramento || '—').slice(0, 28)}</td>
       <td style="font-size:12px">${Data.etapaAtual(a)}</td>
       <td>${UI.badge(Data.statusAtual(a))}</td>
-      <td style="font-family:var(--mono);color:var(--text3)">${a.ano}</td></tr>`
+      <td style="font-family:var(--mono);color:var(--text3);white-space:nowrap">${a.ano}</td></tr>`
   }).join('')
   UI.renderPager('aits-pager', aitPage, total, renderAITs)
 }
@@ -405,7 +406,7 @@ async function renderRecursos() {
       <td${codigoAtributos}>${item.codigo.slice(0, 28)}</td>
       <td style="font-size:12px;color:var(--text3)">${item.enquadramento.slice(0, 22)}</td>
       <td><span class="badge b-blue">${item.prox}</span></td>
-      <td style="font-family:var(--mono);font-size:12px">${item.prazo || '—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">${item.prazo || '—'}</td>
       <td><span class="badge ${u.c}">${u.t}</span></td>
       <td><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button></td></tr>`
   }).join('') : '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3)">Nenhum recurso pendente</td></tr>'

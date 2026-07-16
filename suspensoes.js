@@ -231,8 +231,8 @@ const Suspensoes = (() => {
         {key:'processo',  label:'Processo',   w:'100px'},
         {key:'etapa',     label:'Etapa',      w:'90px'},
         {key:'status',    label:'Status',     w:'100px'},
-        {key:'ano',       label:'Ano',        w:'55px'},
-        {key:'vencimento',label:'Vencimento', w:'90px'},
+        {key:'ano',       label:'Ano',        w:'70px'},
+        {key:'vencimento',label:'Vencimento', w:'115px'},
         {key:'ultima_att',label:'Últ. att.',  w:'80px'}
       ]
       var thHtml = cols.map(function(c) {
@@ -272,8 +272,8 @@ const Suspensoes = (() => {
         '<td style="font-family:var(--mono);font-size:12px">' + (s.processo || '—') + '</td>' +
         '<td style="font-size:12px">' + et + '</td>' +
         '<td>' + badgeSt + '</td>' +
-        '<td style="font-family:var(--mono);color:var(--text3)">' + (s.ano || '—') + '</td>' +
-        '<td style="font-size:12px">' + vencLabel + '</td>' +
+        '<td style="font-family:var(--mono);color:var(--text3);white-space:nowrap">' + (s.ano || '—') + '</td>' +
+        '<td style="font-size:12px;white-space:nowrap">' + vencLabel + '</td>' +
         '<td style="font-size:12px">' + attLabel + '</td>' +
         '<td style="font-size:12px;color:var(--text3)">' + (s.observacao || '—').slice(0, 25) + '</td>' +
         '</tr>'
