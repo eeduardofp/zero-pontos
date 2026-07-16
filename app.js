@@ -384,7 +384,7 @@ async function renderRecursos() {
       cliente: cl ? cl.nome : '—',
       identificador: 'Processo ' + (s.processo || '—'),
       codigo: s.processo || '—', enquadramento: 'Suspensão do direito de dirigir',
-      prox, prazo: prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
+      prox, prazo: prox === 'Defesa Prévia' ? s.vencimento_defesa_previa : prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
     }
   })
 
