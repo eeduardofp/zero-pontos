@@ -24,7 +24,7 @@
 |---|---|---|
 | `docs/sql/2026-10-25-defesa-pronta-etapa.sql` | criar | migração `ADD COLUMN` (Eduardo executa) |
 | `defesa-pronta.js` | criar | lógica pura: `estado()` e `contar()` |
-| `tests/defesa-pronta.test.js` | criar | testes da lógica pura (`node --test`) |
+| `automacao/test/defesa-pronta.test.js` | criar | testes da lógica pura (rodam no `npm test` de `automacao/`) |
 | `suspensoes.js` | modificar (`:491`) | exportar `updateSuspensao` |
 | `app.js` | modificar (`:363-423`) | tag, contador, toggle, nova estrutura das células |
 | `app.html` | modificar (`:8`, `:142-147`, `:347-348`) | larguras da tabela, contador, `<script>` novo, versões |
@@ -82,17 +82,17 @@ Esperado: `{ aits: 'ok', suspensoes: 'ok' }`. Se aparecer erro de coluna inexist
 ### Task 2: Lógica pura `defesa-pronta.js` (TDD)
 
 **Files:**
-- Create: `tests/defesa-pronta.test.js`
+- Create: `automacao/test/defesa-pronta.test.js`
 - Create: `defesa-pronta.js`
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-`tests/defesa-pronta.test.js`:
+`automacao/test/defesa-pronta.test.js`:
 
 ```js
 const test = require('node:test')
 const assert = require('node:assert')
-const DefesaPronta = require('../defesa-pronta.js')
+const DefesaPronta = require('../../defesa-pronta.js')
 
 test('estado: nunca marcada (null) é pendente', () => {
   assert.strictEqual(DefesaPronta.estado(null, 'JARI'), 'pendente')
@@ -132,7 +132,7 @@ test('contar: lista vazia', () => {
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd "C:/Users/eduar/OneDrive/Documents/Zero Pontos/repo/zero-pontos" && node --test tests/defesa-pronta.test.js`
+Run: `cd "C:/Users/eduar/OneDrive/Documents/Zero Pontos/repo/zero-pontos" && (cd automacao && node --test test/defesa-pronta.test.js)`
 Expected: FAIL — `Cannot find module '../defesa-pronta.js'`.
 
 - [ ] **Step 3: Implementar**
@@ -164,13 +164,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = DefesaPron
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `node --test tests/defesa-pronta.test.js`
+Run: `(cd automacao && node --test test/defesa-pronta.test.js)`
 Expected: `pass 6`, `fail 0`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defesa-pronta.js tests/defesa-pronta.test.js
+git add defesa-pronta.js automacao/test/defesa-pronta.test.js
 git commit -m "feat: lógica pura da tag Pronta/Pendente (estado e contagem)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
@@ -439,7 +439,7 @@ async function renderRecursos() {
 
 - [ ] **Step 2: Conferir sintaxe e rodar testes**
 
-Run: `node --check app.js && node --test tests/defesa-pronta.test.js`
+Run: `node --check app.js && (cd automacao && node --test test/defesa-pronta.test.js)`
 Expected: `--check` sem saída; testes `pass 6`.
 
 - [ ] **Step 3: Commit**

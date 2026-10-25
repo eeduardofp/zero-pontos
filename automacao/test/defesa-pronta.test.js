@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert')
-const DefesaPronta = require('../defesa-pronta.js')
+const DefesaPronta = require('../../defesa-pronta.js')
 
 test('estado: nunca marcada (null) é pendente', () => {
   assert.strictEqual(DefesaPronta.estado(null, 'JARI'), 'pendente')
