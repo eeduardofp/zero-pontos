@@ -36,3 +36,28 @@ test('contar: totaliza prontas e pendentes', () => {
 test('contar: lista vazia', () => {
   assert.deepStrictEqual(DefesaPronta.contar([]), { prontas: 0, pendentes: 0 })
 })
+
+test('tagHtml: pronta gera tag verde com texto Pronta e ação de alternar', () => {
+  const h = DefesaPronta.tagHtml('suspensao', 's0051', 'JARI', 'JARI')
+  assert.ok(h.includes('tag-defesa ok'))
+  assert.ok(h.includes('>Pronta<'))
+  assert.ok(h.includes("toggleDefesaPronta('suspensao','s0051')"))
+  assert.ok(h.includes('aria-label="Defesa pronta.'))
+})
+
+test('tagHtml: pendente gera tag cinza com texto Pendente', () => {
+  const h = DefesaPronta.tagHtml('ait', 'abc123', null, 'JARI')
+  assert.ok(h.includes('tag-defesa no'))
+  assert.ok(h.includes('>Pendente<'))
+  assert.ok(h.includes("toggleDefesaPronta('ait','abc123')"))
+})
+
+test('tagHtml: marcação de etapa antiga aparece como pendente', () => {
+  const h = DefesaPronta.tagHtml('ait', 'abc123', 'Defesa Prévia', 'JARI')
+  assert.ok(h.includes('tag-defesa no'))
+})
+
+test('tagHtml: teclado Enter e Espaço acionam o mesmo toggle', () => {
+  const h = DefesaPronta.tagHtml('ait', 'x1', null, 'JARI')
+  assert.ok(h.includes("onkeydown=\"if(event.key==='Enter'||event.key===' ')"))
+})

@@ -88,6 +88,8 @@ tbody td.bold{color:var(--text);font-weight:500}
 .acoes-recurso{display:flex;gap:6px}
 #pg-recursos .tbl-wrap{overflow-x:auto}
 #tbl-recursos{min-width:1220px}
+#tbl-recursos th,#tbl-recursos td{padding-left:10px;padding-right:10px}
+#tbl-recursos td.cod-cell{white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 /* FILTERS */
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .fbtn{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-family:var(--mono);transition:all .15s}

@@ -14,7 +14,19 @@ const DefesaPronta = (() => {
     return { prontas, pendentes: itens.length - prontas }
   }
 
-  return { estado, contar }
+  // HTML da tag, igual na Fila de recursos e na tela Hoje.
+  // tipo: 'ait' | 'suspensao' (o que toggleDefesaPronta espera).
+  function tagHtml(tipo, id, marcadaEtapa, proximaEtapa) {
+    const pronta = estado(marcadaEtapa, proximaEtapa) === 'pronta'
+    const alternar = "toggleDefesaPronta('" + tipo + "','" + id + "')"
+    return '<span class="tag-defesa ' + (pronta ? 'ok' : 'no') + '" role="button" tabindex="0"' +
+      ' aria-label="Defesa ' + (pronta ? 'pronta' : 'pendente') + '. Clique para alternar"' +
+      ' onclick="' + alternar + '"' +
+      ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();' + alternar + '}">' +
+      (pronta ? 'Pronta' : 'Pendente') + '</span>'
+  }
+
+  return { estado, contar, tagHtml }
 })()
 
 if (typeof module !== 'undefined' && module.exports) module.exports = DefesaPronta
