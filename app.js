@@ -372,6 +372,46 @@ function ignorarRecurso(tipo, id) {
   renderRecursos()
 }
 
+// Tag Pronta/Pendente: grava no item a etapa para a qual a defesa está pronta.
+const _defesaEmVoo = new Set()
+
+function defesaItem(tipo, id) {
+  return tipo === 'suspensao' ? Suspensoes.getById(id) : Data.getAITs().find(a => a.id === id)
+}
+
+function defesaAplicarLocal(tipo, id, etapa) {
+  if (tipo === 'suspensao') {
+    const s = Suspensoes.getById(id)
+    if (s) s.defesa_pronta_etapa = etapa
+  } else {
+    Data.updateAITCache(id, { defesa_pronta_etapa: etapa })
+  }
+}
+
+async function toggleDefesaPronta(tipo, id) {
+  const chave = tipo + ':' + id
+  if (_defesaEmVoo.has(chave)) return
+  const item = defesaItem(tipo, id)
+  if (!item) return
+  const prox = tipo === 'suspensao' ? Suspensoes.proximaEtapa(item) : Data.proximaEtapa(item)
+  if (!prox) return
+  const anterior = item.defesa_pronta_etapa || null
+  const novo = DefesaPronta.estado(anterior, prox) === 'pronta' ? null : prox
+  _defesaEmVoo.add(chave)
+  defesaAplicarLocal(tipo, id, novo)
+  renderRecursos()
+  try {
+    if (tipo === 'suspensao') await Suspensoes.updateSuspensao(id, { defesa_pronta_etapa: novo })
+    else await API.updateAIT(id, { defesa_pronta_etapa: novo })
+  } catch (e) {
+    defesaAplicarLocal(tipo, id, anterior)
+    renderRecursos()
+    UI.notif('Erro ao salvar a tag: ' + e.message, 'error')
+  } finally {
+    _defesaEmVoo.delete(chave)
+  }
+}
+
 async function renderRecursos() {
   await Suspensoes.garantirCarregado()
   const ignorados = new Set(getIgnorados())
@@ -383,7 +423,8 @@ async function renderRecursos() {
       cliente: cl ? cl.nome : '—',
       identificador: (pl ? pl.placa : '—') + '<br><span style="color:var(--text3)">' + (pl ? pl.renavan : '—') + '</span>',
       codigo: a.codigo, enquadramento: a.enquadramento || '—',
-      prox: Data.proximaEtapa(a), prazo: a.vencimento
+      prox: Data.proximaEtapa(a), prazo: a.vencimento,
+      marcada: a.defesa_pronta_etapa || null
     }
   })
 
@@ -395,7 +436,8 @@ async function renderRecursos() {
       cliente: cl ? cl.nome : '—',
       identificador: 'Processo ' + (s.processo || '—'),
       codigo: s.processo || '—', enquadramento: 'Suspensão do direito de dirigir',
-      prox, prazo: prox === 'Defesa Prévia' ? s.vencimento_defesa_previa : prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
+      prox, prazo: prox === 'Defesa Prévia' ? s.vencimento_defesa_previa : prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran,
+      marcada: s.defesa_pronta_etapa || null
     }
   })
 
@@ -403,22 +445,31 @@ async function renderRecursos() {
   // Suspensão sempre antes de AIT — consequência maior pro cliente.
   const list = [...susItens.sort(porUrgencia), ...aitItens.sort(porUrgencia)]
 
+  const cont = document.getElementById('recursos-contador')
+  if (cont) {
+    const c = DefesaPronta.contar(list)
+    cont.textContent = list.length ? c.prontas + ' prontas · ' + c.pendentes + ' pendentes' : ''
+  }
+
   const body = document.getElementById('recursos-body')
   body.innerHTML = list.length ? list.map(item => {
     const u = Data.urgLabel(item.prazo)
-    const tag = item.tipo === 'suspensao' ? '<span class="badge b-no" style="margin-right:6px">⚠ CNH</span>' : ''
+    const tag = item.tipo === 'suspensao' ? '<span class="badge b-no">⚠ CNH</span>' : ''
+    const pronta = DefesaPronta.estado(item.marcada, item.prox) === 'pronta'
+    const alternar = `toggleDefesaPronta('${item.tipo}','${item.id}')`
+    const tagDefesa = `<span class="tag-defesa ${pronta ? 'ok' : 'no'}" role="button" tabindex="0" aria-label="Defesa ${pronta ? 'pronta' : 'pendente'}. Clique para alternar" onclick="${alternar}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${alternar}}">${pronta ? 'Pronta' : 'Pendente'}</span>`
     const acao = item.tipo === 'suspensao' ? `openRecursoSus('${item.id}')` : `openRecurso('${item.id}')`
     const abreContexto = item.tipo === 'suspensao' ? `Suspensoes.abrirDetalhe('${item.id}')` : `openAIT('${item.id}')`
     const codigoAtributos = ` style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="${abreContexto}"`
     return `<tr>
-      <td class="bold">${tag}${item.cliente.split(' ').slice(0, 2).join(' ')}</td>
+      <td class="bold"><div class="cli-cell">${tagDefesa}${tag}<span class="nm">${item.cliente.split(' ').slice(0, 2).join(' ')}</span></div></td>
       <td style="font-family:var(--mono);font-size:11px">${item.identificador}</td>
       <td${codigoAtributos}>${item.codigo.slice(0, 28)}</td>
       <td style="font-size:12px;color:var(--text3)">${item.enquadramento.slice(0, 22)}</td>
       <td><span class="badge b-blue">${item.prox}</span></td>
       <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">${item.prazo || '—'}</td>
       <td><span class="badge ${u.c}">${u.t}</span></td>
-      <td style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button><button class="btn btn-ghost btn-sm" onclick="ignorarRecurso('${item.tipo}','${item.id}')">Ignorar</button></td></tr>`
+      <td><div class="acoes-recurso"><button class="btn btn-primary btn-sm" onclick="${acao}">Protocolar</button><button class="btn btn-ghost btn-sm" onclick="ignorarRecurso('${item.tipo}','${item.id}')">Ignorar</button></div></td></tr>`
   }).join('') : '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3)">Nenhum recurso pendente</td></tr>'
 }
 
