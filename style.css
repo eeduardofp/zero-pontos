@@ -78,6 +78,16 @@ tbody td.bold{color:var(--text);font-weight:500}
 .b-no{background:var(--red-bg);color:var(--red)}
 .b-na{background:var(--bg3);color:var(--text3)}
 .b-blue{background:var(--blue-bg);color:var(--blue)}
+/* FILA DE RECURSOS — tag de defesa, célula do cliente, ações, tabela */
+.cli-cell{display:flex;align-items:center;gap:6px;min-width:0}
+.cli-cell .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tag-defesa{flex:none;width:74px;text-align:center;font-size:11px;font-weight:500;font-family:var(--mono);padding:3px 0;border-radius:6px;border:1px solid transparent;cursor:pointer;user-select:none}
+.tag-defesa.ok{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.tag-defesa.no{background:var(--bg3);color:var(--text3);border-color:var(--border2)}
+.tag-defesa:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.acoes-recurso{display:flex;gap:6px}
+#pg-recursos .tbl-wrap{overflow-x:auto}
+#tbl-recursos{min-width:1220px}
 /* FILTERS */
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .fbtn{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-family:var(--mono);transition:all .15s}

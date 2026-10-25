@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AIT Control</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=r4">
 </head>
 <body>
 
@@ -139,11 +139,11 @@
 
 <div class="page" id="pg-recursos">
   <div class="page-header">
-    <div><div class="page-title">Fila de recursos</div><div class="page-sub">Recursos que precisam ser protocolados</div></div>
+    <div><div class="page-title">Fila de recursos</div><div class="page-sub">Recursos que precisam ser protocolados <span id="recursos-contador" style="margin-left:10px;color:var(--text3)"></span></div></div>
     <button class="btn btn-ghost btn-sm" onclick="renderRecursos()">↻ Atualizar</button>
   </div>
   <div class="tbl-wrap">
-    <table style="table-layout:fixed"><thead><tr><th style="width:18%">Cliente</th><th style="width:120px">Identificador</th><th style="width:22%">Código</th><th>Enquadramento</th><th style="width:100px">Recurso</th><th style="width:115px">Prazo</th><th style="width:100px">Urgência</th><th style="width:170px"></th></tr></thead><tbody id="recursos-body"></tbody></table>
+    <table id="tbl-recursos" style="table-layout:fixed"><thead><tr><th style="width:330px">Cliente</th><th style="width:120px">Identificador</th><th style="width:140px">Código</th><th>Enquadramento</th><th style="width:90px">Recurso</th><th style="width:105px">Prazo</th><th style="width:130px">Urgência</th><th style="width:200px"></th></tr></thead><tbody id="recursos-body"></tbody></table>
   </div>
 </div>
 
@@ -344,8 +344,9 @@
 <script src="data.js?v=r5"></script>
 <script src="ui.js?v=r5"></script>
 <script src="api.js?v=r5"></script>
-<script src="app.js?v=r6"></script>
-<script src="suspensoes.js?v=r6"></script>
+<script src="defesa-pronta.js?v=r1"></script>
+<script src="app.js?v=r7"></script>
+<script src="suspensoes.js?v=r7"></script>
 <script src="comercial.js?v=r5"></script>
 <script src="documentos.js?v=r5"></script>
 <script src="home.js?v=r6"></script>

@@ -489,6 +489,6 @@ const Suspensoes = (() => {
     render, renderLista, abrirDetalhe, abrirNova,
     acFiltrar, acFechar, sortBy,
     precisaRecurso, proximaEtapa, getLista, garantirCarregado, getById,
-    confirmarRecurso, etapaAtual, statusAtual
+    confirmarRecurso, etapaAtual, statusAtual, updateSuspensao
   }
 })()
