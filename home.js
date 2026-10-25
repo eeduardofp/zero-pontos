@@ -18,17 +18,16 @@ const Home = (() => {
     const verificar = aits.filter(a => !a.encerrado && Data.daysSince(a.ultima_att) >= 21).length
     const susList = typeof Suspensoes !== 'undefined' ? Suspensoes.getLista() : []
     const recursos = aits.filter(Data.precisaRecurso).length + susList.filter(Suspensoes.precisaRecurso).length
-    const fat = aits.reduce((s, a) => s + (a.valor || 0), 0)
 
     const itens = []
     aits.filter(Data.precisaRecurso).forEach(a => {
       const pl = Data.gPlaca(a.placa_id), cl = pl ? Data.gCliente(pl.cliente_id) : null
-      itens.push({ tipo: 'ait', id: a.id, cliente: cl ? cl.nome : '—', cod: a.codigo, etapa: Data.proximaEtapa(a), prazo: a.vencimento })
+      itens.push({ tipo: 'ait', id: a.id, cliente: cl ? cl.nome : '—', cod: a.codigo, etapa: Data.proximaEtapa(a), prazo: a.vencimento, marcada: a.defesa_pronta_etapa || null })
     })
     susList.filter(Suspensoes.precisaRecurso).forEach(s => {
       const cl = Data.gCliente(s.cliente_id), prox = Suspensoes.proximaEtapa(s)
       const prazoSus = prox === 'Defesa Prévia' ? s.vencimento_defesa_previa : prox === 'JARI' ? s.vencimento_jari : s.vencimento_cetran
-      itens.push({ tipo: 'sus', id: s.id, cliente: cl ? cl.nome : '—', cod: 'Proc ' + (s.processo || '—'), etapa: prox, prazo: prazoSus })
+      itens.push({ tipo: 'sus', id: s.id, cliente: cl ? cl.nome : '—', cod: 'Proc ' + (s.processo || '—'), etapa: prox, prazo: prazoSus, marcada: s.defesa_pronta_etapa || null })
     })
 
     const grupos = [[], [], [], []]
@@ -42,11 +41,12 @@ const Home = (() => {
     const metric = (l, v, c) => `<div class="metric"><div class="metric-label">${l}</div><div class="metric-val"${c ? ` style="color:${c}"` : ''}>${v}</div></div>`
     const linha = it => {
       const u = Data.urgLabel(it.prazo)
-      const tag = it.tipo === 'sus' ? '<span class="badge b-no" style="margin-right:6px">⚠ CNH</span>' : ''
       const acao = it.tipo === 'sus' ? `openRecursoSus('${it.id}')` : `openRecurso('${it.id}')`
       const abre = it.tipo === 'sus' ? `Suspensoes.abrirDetalhe('${it.id}')` : `openAIT('${it.id}')`
+      const tagDef = DefesaPronta.tagHtml(it.tipo === 'sus' ? 'suspensao' : 'ait', it.id, it.marcada, it.etapa)
+      const tag = it.tipo === 'sus' ? `<span class="badge b-no" style="cursor:pointer" onclick="${abre}">⚠ CNH</span>` : ''
       return `<tr>
-        <td class="bold" style="cursor:pointer" onclick="${abre}">${tag}${it.cliente.split(' ').slice(0, 2).join(' ')}</td>
+        <td class="bold"><div class="cli-cell">${tagDef}${tag}<span class="nm" style="cursor:pointer" onclick="${abre}">${it.cliente.split(' ').slice(0, 2).join(' ')}</span></div></td>
         <td style="font-family:var(--mono);font-size:11px;cursor:pointer" onclick="${abre}">${(it.cod || '').slice(0, 26)}</td>
         <td><span class="badge b-blue">${it.etapa || '—'}</span></td>
         <td style="font-family:var(--mono);font-size:12px">${it.prazo || '—'}</td>
@@ -60,7 +60,7 @@ const Home = (() => {
 
     document.getElementById('pg-hoje').innerHTML =
       `<div class="page-header"><div><div class="page-title">Hoje</div><div class="page-sub">Prioridades por prazo</div></div></div>
-       <div class="metrics">${metric('AITs ativas', ativas)}${metric('A verificar', verificar, 'var(--amber)')}${metric('Recursos pendentes', recursos, 'var(--red)')}${metric('Faturamento', Data.fmtMoeda(fat), 'var(--green)')}</div>
+       <div class="metrics" style="grid-template-columns:repeat(3,1fr)">${metric('AITs ativas', ativas)}${metric('A verificar', verificar, 'var(--amber)')}${metric('Recursos pendentes', recursos, 'var(--red)')}</div>
        ${[0, 1, 2, 3].map(bloco).join('') || '<div style="color:var(--text3);padding:20px">Nada pendente 🎉</div>'}`
   }
   return { render }

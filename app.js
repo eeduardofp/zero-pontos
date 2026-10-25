@@ -388,6 +388,13 @@ function defesaAplicarLocal(tipo, id, etapa) {
   }
 }
 
+// A etiqueta vive no próprio item (AIT/suspensão), então Fila e Hoje leem o
+// mesmo dado; ao alternar, as duas telas são redesenhadas.
+function defesaRerender() {
+  renderRecursos()
+  if (typeof Home !== 'undefined') Home.render()
+}
+
 async function toggleDefesaPronta(tipo, id) {
   const chave = tipo + ':' + id
   if (_defesaEmVoo.has(chave)) return
@@ -399,13 +406,13 @@ async function toggleDefesaPronta(tipo, id) {
   const novo = DefesaPronta.estado(anterior, prox) === 'pronta' ? null : prox
   _defesaEmVoo.add(chave)
   defesaAplicarLocal(tipo, id, novo)
-  renderRecursos()
+  defesaRerender()
   try {
     if (tipo === 'suspensao') await Suspensoes.updateSuspensao(id, { defesa_pronta_etapa: novo })
     else await API.updateAIT(id, { defesa_pronta_etapa: novo })
   } catch (e) {
     defesaAplicarLocal(tipo, id, anterior)
-    renderRecursos()
+    defesaRerender()
     UI.notif('Erro ao salvar a tag: ' + e.message, 'error')
   } finally {
     _defesaEmVoo.delete(chave)
@@ -455,16 +462,14 @@ async function renderRecursos() {
   body.innerHTML = list.length ? list.map(item => {
     const u = Data.urgLabel(item.prazo)
     const tag = item.tipo === 'suspensao' ? '<span class="badge b-no">⚠ CNH</span>' : ''
-    const pronta = DefesaPronta.estado(item.marcada, item.prox) === 'pronta'
-    const alternar = `toggleDefesaPronta('${item.tipo}','${item.id}')`
-    const tagDefesa = `<span class="tag-defesa ${pronta ? 'ok' : 'no'}" role="button" tabindex="0" aria-label="Defesa ${pronta ? 'pronta' : 'pendente'}. Clique para alternar" onclick="${alternar}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${alternar}}">${pronta ? 'Pronta' : 'Pendente'}</span>`
+    const tagDefesa = DefesaPronta.tagHtml(item.tipo, item.id, item.marcada, item.prox)
     const acao = item.tipo === 'suspensao' ? `openRecursoSus('${item.id}')` : `openRecurso('${item.id}')`
     const abreContexto = item.tipo === 'suspensao' ? `Suspensoes.abrirDetalhe('${item.id}')` : `openAIT('${item.id}')`
     const codigoAtributos = ` style="font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--blue)" onclick="${abreContexto}"`
     return `<tr>
       <td class="bold"><div class="cli-cell">${tagDefesa}${tag}<span class="nm">${item.cliente.split(' ').slice(0, 2).join(' ')}</span></div></td>
       <td style="font-family:var(--mono);font-size:11px">${item.identificador}</td>
-      <td${codigoAtributos}>${item.codigo.slice(0, 28)}</td>
+      <td class="cod-cell"${codigoAtributos}>${item.codigo || '—'}</td>
       <td style="font-size:12px;color:var(--text3)">${item.enquadramento.slice(0, 22)}</td>
       <td><span class="badge b-blue">${item.prox}</span></td>
       <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">${item.prazo || '—'}</td>
